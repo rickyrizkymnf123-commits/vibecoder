@@ -144,6 +144,39 @@ export async function runAgenticLoop(options: RunAgentOptions): Promise<AgentRun
   // Inisialisasi workspace fisik di disk
   const wsDir = getWorkspaceDir(sessionId);
 
+  // Periksa apakah ini sesi lanjutan / modifikasi aplikasi yang sudah ada
+  const existingFiles: string[] = [];
+  if (fs.existsSync(wsDir)) {
+    const walk = (d: string) => {
+      for (const f of fs.readdirSync(d)) {
+        if (f === 'node_modules' || f === '.git' || f === 'screenshots') continue;
+        const p = path.join(d, f);
+        if (fs.statSync(p).isDirectory()) walk(p);
+        else existingFiles.push(path.relative(wsDir, p).split(path.sep).join('/'));
+      }
+    };
+    walk(wsDir);
+  }
+
+  const isFollowUp = existingFiles.length > 0;
+  let formattedUserPrompt = userPrompt;
+
+  if (isFollowUp) {
+    formattedUserPrompt = `[MODE PEMBARUAN / ITERASI APLIKASI YANG SUDAH ADA]
+Pengguna sedang menginspeksi aplikasi yang sebelumnya telah dibuat di sesi ini dan sekarang meminta perubahan / penambahan:
+"${userPrompt}"
+
+Berkas-berkas yang saat ini sudah ada di workspace:
+${existingFiles.map((f) => `- ${f}`).join('\n')}
+
+ATURAN WAJIB UNTUK PERUBAHAN / ITERASI:
+1. Pahami bagian mana yang diminta oleh pengguna untuk diubah (misalnya mengganti palet warna di 'public/css/style.css' atau kelas Tailwind di 'public/index.html', menambahkan tombol/fitur baru, menambah kolom tabel, atau memperbaiki tata letak).
+2. Gunakan tool 'read_file' untuk membaca berkas yang relevan sebelum mengubahnya.
+3. Gunakan tool 'edit_file' (untuk mengubah baris/blok teks tertentu) atau 'write_file' untuk memperbarui berkas tersebut. JANGAN menghapus fitur-fitur yang sudah bekerja dengan baik, melainkan modifikasi atau tambahkan sesuai instruksi pengguna.
+4. Lakukan verifikasi via 'browser_test' untuk memastikan perubahan tampil rapi dan tidak menimbulkan error console.
+5. Panggil tool 'publish_app' untuk memperbarui status aplikasi di live preview agar pengguna dapat langsung melihat perubahannya.`;
+  }
+
   // Klarifikasi jika prompt terlalu singkat atau kosong
   if (userPrompt.trim().length < 10) {
     const clarificationMessage = 'Halo! Permintaan Anda tampak sangat singkat. Mohon jelaskan lebih detail aplikasi apa yang ingin Anda bangun (misalnya: nama aplikasi, fitur utama, peran pengguna/admin, dan laporan atau data yang ingin dikelola).';
@@ -294,12 +327,14 @@ export async function runAgenticLoop(options: RunAgentOptions): Promise<AgentRun
     const completionsUrl = `${cleanBaseUrl}/chat/completions`;
     const openAiTools = getOpenAiTools();
 
-    planNarrative = `Memulai perancangan aplikasi untuk: "${userPrompt}". Terhubung langsung ke AI (${aiConfig.defaultModel} di ${cleanBaseUrl}). Menjalankan alur otonom bertahap.`;
+    planNarrative = isFollowUp
+      ? `Menganalisis instruksi perubahan pengguna: "${userPrompt}". Menginspeksi berkas yang sudah ada (${existingFiles.length} berkas) dan menerapkan modifikasi yang diminta.`
+      : `Memulai perancangan aplikasi untuk: "${userPrompt}". Terhubung langsung ke AI (${aiConfig.defaultModel} di ${cleanBaseUrl}). Menjalankan alur otonom bertahap.`;
     await onEvent({ type: 'plan', content: planNarrative, generationMode: 'live-ai' });
 
     const messages: any[] = [
       { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: userPrompt }
+      { role: 'user', content: formattedUserPrompt }
     ];
 
     let turn = 0;
@@ -500,13 +535,15 @@ export async function runAgenticLoop(options: RunAgentOptions): Promise<AgentRun
   const candidateModels = ['gemini-2.5-flash', 'gemini-3.5-flash', 'gemini-2.0-flash'];
   let geminiActiveModel = candidateModels[0];
 
-  planNarrative = `Memulai perancangan aplikasi untuk: "${userPrompt}". Menggunakan model Gemini (${geminiActiveModel}) untuk eksekusi coding bertahap.`;
+  planNarrative = isFollowUp
+    ? `Menganalisis instruksi perubahan pengguna: "${userPrompt}". Menginspeksi berkas yang sudah ada (${existingFiles.length} berkas) dan menerapkan modifikasi yang diminta.`
+    : `Memulai perancangan aplikasi untuk: "${userPrompt}". Menggunakan model Gemini (${geminiActiveModel}) untuk eksekusi coding bertahap.`;
   await onEvent({ type: 'plan', content: planNarrative, generationMode: 'live-ai' });
 
   const contents: any[] = [
     {
       role: 'user',
-      parts: [{ text: `${SYSTEM_PROMPT}\n\nPermintaan Pengguna:\n${userPrompt}` }]
+      parts: [{ text: `${SYSTEM_PROMPT}\n\nPermintaan Pengguna:\n${formattedUserPrompt}` }]
     }
   ];
 
