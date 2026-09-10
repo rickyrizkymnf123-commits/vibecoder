@@ -24,6 +24,8 @@ export interface AgentStepEvent {
   todoList?: TodoItem[];
   app?: Partial<GeneratedApp>;
   message?: string;
+  generationMode?: 'live-ai' | 'fallback-template';
+  fallbackReason?: string;
 }
 
 export interface RunAgentOptions {
@@ -44,6 +46,8 @@ export interface AgentRunResult {
   planNarrative: string;
   summaryMessage: string;
   totalTokensUsed: number;
+  generationMode: 'live-ai' | 'fallback-template';
+  fallbackReason?: string;
 }
 
 export interface DomainConfig {
@@ -237,7 +241,8 @@ export async function runAgenticLoop(options: RunAgentOptions): Promise<AgentRun
       todoList: [],
       planNarrative: '',
       summaryMessage: clarificationMessage,
-      totalTokensUsed: 150
+      totalTokensUsed: 150,
+      generationMode: 'live-ai'
     };
   }
 
@@ -247,6 +252,9 @@ export async function runAgenticLoop(options: RunAgentOptions): Promise<AgentRun
   let planNarrative = '';
   let summaryMessage = '';
   let totalTokensUsed = 0;
+  let generationMode: 'live-ai' | 'fallback-template' = 'live-ai';
+  let fallbackReason: string | undefined = undefined;
+  let lastGeminiErrorReason = '';
 
   const apiKey = process.env.GEMINI_API_KEY;
 
@@ -481,17 +489,19 @@ PERATURAN:
 
   // 2. Fallback to Google Gemini API (if custom AI didn't deploy)
   const candidateModels = [
-    process.env.AI_DEFAULT_MODEL || 'gemini-3.7-flash',
-    'gemini-3.6-flash',
-    'gemini-3.5-flash'
+    'gemini-3.5-flash', // Top priority: generous free-tier quota & fast execution
+    'gemini-3.6-flash', // Failover 1: comprehensive preview model
+    process.env.AI_DEFAULT_MODEL || 'gemini-3.5-flash',
+    'gemini-3.7-flash'  // Failover 2: high demand / 20 req daily limit
   ];
+  const uniqueCandidateModels = Array.from(new Set(candidateModels));
 
   let useLiveGemini = Boolean(!deployedApp && apiKey && !apiKey.startsWith('AQ.dummy') && !apiKey.includes('TEST_'));
 
   if (useLiveGemini && !deployedApp) {
     try {
-      planNarrative = `Menganalisis arsitektur untuk: "${userPrompt}". Menyiapkan rencana eksekusi multi-role, struktur database, logika bisnis, dan antarmuka web interaktif secara bertahap.`;
-      await onEvent({ type: 'plan', content: planNarrative });
+      planNarrative = `Menganalisis arsitektur untuk: "${userPrompt}". Menyiapkan rencana eksekusi multi-role, struktur database, logika bisnis, dan antarmuka web interaktif secara bertahap via Live AI.`;
+      await onEvent({ type: 'plan', content: planNarrative, generationMode: 'live-ai' });
       await waitPacing(1200, 1800);
 
       const contents: any[] = [
@@ -509,6 +519,7 @@ PERATURAN:
 
       let turn = 0;
       const MAX_TURNS = 10;
+      const writtenFiles: string[] = [];
 
       while (turn < MAX_TURNS && !deployedApp) {
         turn++;
@@ -517,13 +528,14 @@ PERATURAN:
         let geminiResponse: any = null;
         let activeModelUsed = '';
 
-        for (const model of candidateModels) {
+        for (const model of uniqueCandidateModels) {
           try {
             const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+            const callStart = Date.now();
             const res = await fetch(geminiUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              signal: AbortSignal.timeout(8000),
+              signal: AbortSignal.timeout(35000), // 35s timeout to allow full thought + function call generation
               body: JSON.stringify({
                 contents,
                 systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
@@ -535,27 +547,73 @@ PERATURAN:
               })
             });
 
+            const duration = Date.now() - callStart;
+
             if (res.ok) {
               geminiResponse = await res.json();
               activeModelUsed = model;
+              generationMode = 'live-ai';
+              console.log(`[Gemini Success] Model ${model} responded in ${duration}ms on turn ${turn}`);
               break;
+            } else if (res.status === 429) {
+              const errText = await res.text();
+              let parsedErr: any = null;
+              try { parsedErr = JSON.parse(errText); } catch {}
+              const reason = parsedErr?.error?.message || errText.substring(0, 150);
+              lastGeminiErrorReason = `${model} (HTTP 429): ${reason}`;
+              console.warn(`[Gemini 429 Rate Limit] Model ${model} hit 429 on turn ${turn}. Waiting 6s before retry...`);
+              await waitPacing(5500, 7000);
+
+              try {
+                const retryRes = await fetch(geminiUrl, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  signal: AbortSignal.timeout(35000),
+                  body: JSON.stringify({
+                    contents,
+                    systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+                    tools: toolsConfig,
+                    generationConfig: {
+                      temperature: 0.2,
+                      maxOutputTokens: 8192
+                    }
+                  })
+                });
+                if (retryRes.ok) {
+                  geminiResponse = await retryRes.json();
+                  activeModelUsed = model;
+                  generationMode = 'live-ai';
+                  console.log(`[Gemini Success after 429 retry] Model ${model} on turn ${turn}`);
+                  break;
+                }
+              } catch (retryErr: any) {
+                console.warn(`[Gemini Retry Error] ${model}: ${retryErr.message}`);
+              }
             } else {
               const errText = await res.text();
-              console.warn(`[Gemini Retry] Model ${model} returned ${res.status}: ${errText.substring(0, 100)}`);
+              let parsedErr: any = null;
+              try { parsedErr = JSON.parse(errText); } catch {}
+              const reason = parsedErr?.error?.message || errText.substring(0, 150);
+              const errCode = parsedErr?.error?.code || res.status;
+              const errStatus = parsedErr?.error?.status || 'ERROR';
+              lastGeminiErrorReason = `${model} (HTTP ${res.status}): ${reason}`;
+              console.error(`[Gemini Failure] Model ${model} failed with HTTP ${res.status} [Code: ${errCode}, Status: ${errStatus}]: ${reason}`);
             }
           } catch (netErr: any) {
-            console.warn(`[Gemini Retry] Network error with ${model}:`, netErr.message);
+            lastGeminiErrorReason = `${model} (${netErr.name}): ${netErr.message}`;
+            console.error(`[Gemini Exception] Error calling ${model} on turn ${turn} (${netErr.name}): ${netErr.message}`);
           }
         }
 
         if (!geminiResponse) {
-          console.warn(`All Gemini models failed on turn ${turn}. Switching to autonomous direct builder.`);
+          console.error(`[Gemini Abort] All Gemini candidate models failed on turn ${turn}. Switching to fallback.`);
           useLiveGemini = false;
           break;
         }
 
         const candidate = geminiResponse.candidates?.[0];
         if (!candidate || !candidate.content) {
+          console.error(`[Gemini Empty] Model ${activeModelUsed} returned no candidate content. FinishReason: ${candidate?.finishReason}`);
           break;
         }
 
@@ -590,6 +648,7 @@ PERATURAN:
               const tc = await recordToolStart('write_file', `Menulis berkas fisik: ${args.path}`, { path: args.path, bytes: args.content?.length || 0 });
               await waitPacing(1800, 2600);
               resultOutput = await executeWriteFile(sessionId, args.path, args.content || '');
+              if (args.path) writtenFiles.push(args.path);
               await recordToolFinish(tc, resultOutput);
 
               // Auto-advance todo item
@@ -600,7 +659,7 @@ PERATURAN:
                 if (activeIdx + 1 < todoList.length) {
                   todoList[activeIdx + 1].active = true;
                 }
-                await onEvent({ type: 'todo', todoList });
+                await onEvent({ type: 'todo', todoList, generationMode: 'live-ai' });
               }
             } else if (name === 'read_file') {
               const tc = await recordToolStart('read_file', `Membaca berkas: ${args.path}`, args);
@@ -632,7 +691,7 @@ PERATURAN:
 
               // Complete all todos
               todoList = todoList.map((t) => ({ ...t, completed: true, active: false }));
-              await onEvent({ type: 'todo', todoList });
+              await onEvent({ type: 'todo', todoList, generationMode: 'live-ai' });
             }
 
             toolResponseParts.push({
@@ -650,25 +709,76 @@ PERATURAN:
             role: 'user',
             parts: toolResponseParts
           });
+          // Pace turns to respect 5 RPM Free Tier limit
+          await waitPacing(3200, 4500);
         } else {
           break;
         }
       }
-    } catch (err) {
-      console.error('Gemini loop error:', err);
+
+      // Auto-finalize if Gemini wrote multiple files but didn't explicitly call publish_app
+      if (!deployedApp && writtenFiles.length >= 2) {
+        const domain = detectDomainConfig(userPrompt);
+        const bashTc = await recordToolStart('bash', 'Pemeriksaan sintaks di terminal: node --check server.js', { command: 'node --check server.js' });
+        await waitPacing(1500, 2000);
+        const bashRes = await executeBash(sessionId, 'node --check server.js');
+        await recordToolFinish(bashTc, bashRes, bashRes.success ? 'completed' : 'failed');
+
+        const pubTc = await recordToolStart('publish_app', `Publish aplikasi "${domain.appName}" ke Live Preview`, { appName: domain.appName, slug: domain.slug });
+        await waitPacing(2000, 2500);
+        const pub = await executePublishApp(sessionId, userId, domain.appName, domain.slug, hasAppCredit);
+        deployedApp = pub.app;
+        await recordToolFinish(pubTc, { success: true, publicUrl: pub.publicUrl, readyState: 'READY' });
+
+        todoList = todoList.map((t) => ({ ...t, completed: true, active: false }));
+        await onEvent({ type: 'todo', todoList, generationMode: 'live-ai' });
+      }
+    } catch (err: any) {
+      console.error('[Gemini Fatal Loop Error]:', err.name, err.message, err.stack);
       useLiveGemini = false;
     }
   }
 
-  // Dynamic Autonomous Fallback Builder (Only executed if user has NOT configured custom AI and Gemini failed)
-  if (!deployedApp && (!aiConfig.baseUrl || !aiConfig.apiKey)) {
+  // CRITICAL: Matikan fallback total kalau user pakai custom API key
+  const hasCustomAi = Boolean(aiConfig.baseUrl && aiConfig.apiKey);
+  if (!deployedApp && hasCustomAi) {
+    const customFailMsg = `Eksekusi AI Kustom (${aiConfig.baseUrl}) tidak dapat menyelesaikan aplikasi: Model tidak memanggil tools pembuatan berkas fisik (${fallbackReason || 'Tanpa respon tool calling'}). Silakan periksa kunci API, kuota, atau ganti model di menu /account.`;
+    await onEvent({
+      type: 'error',
+      message: customFailMsg,
+      generationMode: 'live-ai',
+      fallbackReason: fallbackReason || 'Custom AI execution failed'
+    });
+    return {
+      needsClarification: false,
+      deployedApp: undefined,
+      toolCalls: toolCallsHistory,
+      todoList,
+      planNarrative: `Gagal: ${customFailMsg}`,
+      summaryMessage: customFailMsg,
+      totalTokensUsed,
+      generationMode: 'live-ai',
+      fallbackReason: fallbackReason || 'Custom AI execution failed'
+    };
+  }
+
+  // Dynamic Autonomous Fallback Builder (Safety Net: HANYA dieksekusi jika TIDAK menggunakan custom AI dan seluruh kandidat Gemini API gagal)
+  if (!deployedApp && !hasCustomAi) {
+    generationMode = 'fallback-template';
+    fallbackReason = lastGeminiErrorReason || 'Semua kandidat Gemini API mengalami kendala kuota (429) atau timeout';
+
     const domain = detectDomainConfig(userPrompt);
     const cleanSlug = domain.slug;
     const appTitle = domain.appName;
 
-    // 1. Initial Plan Narrative
-    planNarrative = `Memulai pembangunan aplikasi **${appTitle}** secara bertahap. Saya merancang arsitektur full-stack, skema database multi-role (${domain.roles.join(' & ')}), proteksi otentikasi scrypt, visual ringkasan analitik, dan pengujian in-process tanpa error.`;
-    await onEvent({ type: 'plan', content: planNarrative });
+    // 1. Initial Plan Narrative (Dengan transparansi penuh)
+    planNarrative = `⚠️ **Pemberitahuan Mode Cadangan (Fallback Template)**: Sambungan ke Live Gemini AI sedang mengalami kendala (${fallbackReason}). Sistem secara transparan menggunakan generator cadangan agar aplikasi tetap dapat diuji.\n\nMemulai pembangunan aplikasi **${appTitle}** secara bertahap. Saya merancang arsitektur full-stack, skema database multi-role (${domain.roles.join(' & ')}), proteksi otentikasi scrypt, visual ringkasan analitik, dan pengujian in-process tanpa error.`;
+    await onEvent({
+      type: 'plan',
+      content: planNarrative,
+      generationMode: 'fallback-template',
+      fallbackReason
+    });
     await waitPacing(1500, 2200);
 
     // 2. Structured Todo List tailored to the prompt
@@ -683,7 +793,7 @@ PERATURAN:
       { id: 'todo-8', title: 'Rangkaian pengujian otomatis E2E in-process (16 Skenario)', completed: false, active: false },
       { id: 'todo-9', title: 'Publish aplikasi ke Interactive Live Preview', completed: false, active: false }
     ];
-    await onEvent({ type: 'todo', todoList });
+    await onEvent({ type: 'todo', todoList, generationMode: 'fallback-template', fallbackReason });
     await waitPacing(1800, 2400);
 
     // Step 1: package.json
@@ -950,7 +1060,10 @@ console.log('✅ SELURUH 16 SKENARIO PENGUJIAN LULUS 100%');
     todoList[8].active = false;
     await onEvent({ type: 'todo', todoList });
 
-    summaryMessage = `Aplikasi **${appTitle}** telah selesai dibangun dan siap digunakan!
+    summaryMessage = `⚠️ **[Dihasilkan Menggunakan Mode Cadangan / Fallback Template]**
+Sambungan ke Live Gemini AI sedang terganggu (${fallbackReason || 'High Demand/Quota Exceeded'}), sehingga aplikasi ini disiapkan menggunakan generator cadangan transparan.
+
+Aplikasi **${appTitle}** telah selesai dibangun dan siap digunakan!
 
 ### Akses & Fitur Aplikasi:
 - **Interactive Live Preview:** [${r10.publicUrl}](${r10.publicUrl})
@@ -968,7 +1081,9 @@ Seluruh modul fungsional (CRUD transaksi, manajemen pengguna, kalkulasi saldo, d
     type: 'complete',
     content: summaryMessage,
     app: deployedApp,
-    todoList
+    todoList,
+    generationMode,
+    fallbackReason
   });
 
   return {
@@ -977,6 +1092,8 @@ Seluruh modul fungsional (CRUD transaksi, manajemen pengguna, kalkulasi saldo, d
     todoList,
     planNarrative,
     summaryMessage,
-    totalTokensUsed
+    totalTokensUsed,
+    generationMode,
+    fallbackReason
   };
 }

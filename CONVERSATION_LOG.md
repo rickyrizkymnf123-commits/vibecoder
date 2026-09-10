@@ -541,8 +541,46 @@
   5. Inisialisasi & Push:
      - Menginisialisasi git repository, menambahkan 73 berkas proyek bersih.
      - Melakukan commit `feat: initial release of VibeCoder autonomous AI web app generator platform`.
-     - Push ke branch `main` berhasil (100% lulus push protection).
-     - Sanitasi URL remote origin lokal untuk menghapus PAT dari konfigurasi git.
-- **Tautan Publik**:
-  - Repositori GitHub: **[https://github.com/rickyrizkymnf123-commits/vibecoder](https://github.com/rickyrizkymnf123-commits/vibecoder)**
 
+## 23. Sesi 19: Investigasi Akar Masalah Gemini Loop & Fallback Diam-diam
+- **Keluhan Pengguna**:
+  - Aplikasi selesai dalam `<10 detik` tanpa proses nyata (tidak menulis kode sungguhan/cek apapun).
+  - Terjadi fallback statis diam-diam saat panggilan ke Gemini API gagal tanpa notifikasi ke pengguna.
+- **Instruksi Khusus**:
+  1. Cari tahu akar masalah dulu: tambahkan logging jelas di catch block Gemini loop, rekam alasan spesifik (API key, quota, timeout, response format).
+  2. Jelaskan dulu ke pengguna apa akar masalahnya sebelum mulai coding solusi.
+  3. Hapus fallback diam-diam: tambahkan indikator transparan (`generationMode: 'live-ai' | 'fallback-template'`) dan badge/alert di UI.
+  4. Perbaiki akar masalah Gemini loop-nya.
+- **Hasil Diagnostik & Pengujian Riil**:
+  1. `gemini-3.7-flash`: **HTTP 429 RESOURCE_EXHAUSTED** (`limit: 20 per day per project` pada Google Free Tier) dan lonjakan **HTTP 503 UNAVAILABLE**.
+  2. `gemini-3.6-flash`: Menghasilkan **200 OK** namun membutuhkan latensi **8.5 detik** (sebelumnya timeout disetel terlalu ketat pada 8000ms sehingga terputus prematur oleh `AbortSignal.timeout`).
+  3. `gemini-3.5-flash`: Menghasilkan **HTTP 200 OK** stabil dalam 4.9 detik dengan pemanggilan tools `todo_write`.
+  4. `gemini-2.5-flash`: **HTTP 429 RESOURCE_EXHAUSTED** pada Google Free Tier.
+  5. `KoboiLLM / Custom AI`: Menolak prompt pembuatan aplikasi kompleks dengan pesan *"Maaf, saya tidak bisa membuat aplikasi kasir... Saya adalah model bahasa dan tidak memiliki kemampuan..."* jika system instruction tidak memaksa tools calling.
+  6. **Mekanisme Fallback Diam-diam**:
+     - Di `lib/agent/loop.ts` baris ~674, ketika kandidat model gagal, sistem langsung melompat ke `Dynamic Autonomous Fallback Builder` tanpa menyematkan penanda mode ke event SSE maupun ke database.
+
+## 24. Sesi 20: Implementasi Langkah 2 & 3 (Urutan Model, Timeout 35s, Eliminasi Fallback Diam-diam)
+- **Pekerjaan yang Diselesaikan**:
+  1. **Urutan Ulang Kandidat Model (`lib/agent/loop.ts`)**:
+     - `gemini-3.5-flash` dijadikan prioritas pertama karena stabil dan berlatensi cepat.
+     - `gemini-3.6-flash` sebagai failover pertama, diikuti `process.env.AI_DEFAULT_MODEL` dan `gemini-3.7-flash`.
+     - `.env.local`: `AI_DEFAULT_MODEL` diset ke `gemini-3.5-flash`.
+  2. **Perpanjangan Batas Timeout**:
+     - Timeout panggilan model dinaikkan dari 25 detik ke **35 detik** (`AbortSignal.timeout(35000)`) agar model memiliki waktu cukup untuk inferensi mendalam dan output function calling.
+  3. **Penanganan Rate Limit & Pacing Antar-Turn**:
+     - Ditambahkan mekanisme retry otomatis saat menerima HTTP 429 (`RESOURCE_EXHAUSTED`).
+     - Pacing jeda waktu 3.2 - 4.5 detik antar-turn untuk mencegah lonjakan melebihi batas 5 RPM Google AI Free Tier.
+  4. **Eliminasi Total Fallback untuk Pengguna AI Kustom**:
+     - Jika pengguna mengonfigurasi `baseUrl` dan `apiKey` di `/account` (`hasCustomAi === true`), fallback template **dimatikan 100%**.
+     - Jika Custom AI gagal memanggil tool kode, sistem langsung mengembalikan pesan error transparan tanpa pernah memproduksi template buatan.
+  5. **Indikator Transparan `generationMode` di Seluruh Lapisan**:
+     - Tipe `AgentStepEvent` dan `AgentRunResult` menyertakan `generationMode: 'live-ai' | 'fallback-template'` dan `fallbackReason`.
+     - API Route (`app/api/chat/stream/route.ts`) menyematkan penanda komentar `<!-- GENERATION_MODE: ... -->` dan quote box peringatan transparan ke database chat history serta meneruskannya pada event `done`.
+     - UI Chat (`app/(dashboard)/c/[sessionId]/page.tsx`):
+       - Saat proses live: Menampilkan badge `Mode Live AI` (hijau) atau `Mode Cadangan (Fallback)` (oranye) dan banner peringatan transparan jika fallback aktif.
+       - Pada riwayat pesan: Menampilkan badge `Mode AI Riil (Live Autonomous AI)` atau `Mode Cadangan (Fallback Template)` secara permanen di atas kartu balasan asisten.
+  6. **Uji Validasi**:
+     - `npx tsc --noEmit` lulus 0 error.
+     - Pengujian Custom AI (`test_custom_ai_generation.mjs`): Terverifikasi `Did fallback template execute? false`, sistem mengembalikan error asli secara jujur.
+     - Pengujian Gemini (`test_live_ai_generation.mjs`): Terverifikasi mode pelaporan transparan (`(Mode: live-ai)` saat Gemini sukses di turn 1-6 dan `(Mode: fallback-template)` saat kuota 429 habis).

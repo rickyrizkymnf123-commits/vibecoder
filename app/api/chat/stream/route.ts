@@ -138,17 +138,26 @@ export async function POST(req: NextRequest) {
       const aiCost = genResult.totalTokensUsed || 3500;
       await deductAiCredit(user.id, aiCost, `chat_generation_${sessionId}`);
 
-      // Save assistant message to chat history
+      // Save assistant message to chat history with clear generation mode marker
+      let finalContent = `${genResult.planNarrative}\n\n${genResult.summaryMessage}`;
+      if (genResult.generationMode === 'fallback-template') {
+        finalContent = `<!-- GENERATION_MODE: fallback-template -->\n> ⚠️ **Peringatan Mode Cadangan (Fallback Template)**: Sambungan ke Live AI mengalami kendala (${genResult.fallbackReason || 'Quota limit / High Demand'}). Aplikasi ini disiapkan menggunakan template cadangan agar tetap dapat diuji.\n\n${finalContent}`;
+      } else {
+        finalContent = `<!-- GENERATION_MODE: live-ai -->\n${finalContent}`;
+      }
+
       await createChatMessage({
         session_id: sessionId,
         role: 'assistant',
-        content: `${genResult.planNarrative}\n\n${genResult.summaryMessage}`,
+        content: finalContent,
         tool_calls: genResult.toolCalls,
         todo_list: genResult.todoList
       });
 
       await sendEvent('done', {
         status: 'success',
+        generationMode: genResult.generationMode,
+        fallbackReason: genResult.fallbackReason,
         aiCreditsUsed: aiCost,
         app: genResult.deployedApp
       });

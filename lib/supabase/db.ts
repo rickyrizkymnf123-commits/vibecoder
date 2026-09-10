@@ -502,11 +502,22 @@ export async function saveApp(
     updated_at: now
   };
 
-  const { data, error } = await supabaseAdmin
+  let { data, error } = await supabaseAdmin
     .from('apps')
     .upsert(record, { onConflict: 'id' })
     .select()
     .single();
+
+  if (error && error.message?.includes('apps_session_id_fkey')) {
+    record.session_id = null;
+    const retry = await supabaseAdmin
+      .from('apps')
+      .upsert(record, { onConflict: 'id' })
+      .select()
+      .single();
+    data = retry.data;
+    error = retry.error;
+  }
 
   if (error || !data) {
     throw new Error(`Failed to save app: ${error?.message}`);

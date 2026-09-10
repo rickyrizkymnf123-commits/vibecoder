@@ -249,6 +249,17 @@
   - `lib/agent/tools.ts`: `getOpenAiTools()` mengonversi schema tool calling ke standar OpenAI function tools.
   - `lib/agent/loop.ts`: Memprioritaskan request ke endpoint kustom pengguna (`${baseUrl}/chat/completions`) jika API Key pengguna diisi. Agent milik pengguna memandu langkah ReAct, menulis kode fisik ke disk, menjalankan verifikasi terminal, dan menerbitkan aplikasi ke interactive live preview.
 
+## 21. Investigasi Akar Masalah Gemini Loop & Fallback Diam-diam
+- **Akar Masalah Kegagalan Gemini**:
+  1. `gemini-3.7-flash` & `gemini-2.5-flash` terkena **HTTP 429 RESOURCE_EXHAUSTED** (kuota gratis Google AI Studio terbatas 20 request/hari untuk model preview/3.7).
+  2. `gemini-3.6-flash` membutuhkan waktu respons ~8.5 detik, terputus ketika timeout disetel 8000ms.
+  3. `gemini-3.5-flash` berhasil merespons 200 OK dalam 4.9 detik dan mengeksekusi function calling (`todo_write`).
+  4. Penyedia Kustom KoboiLLM membalas chat teks penolakan jika format pesan sistem tidak secara eksplisit mewajibkan JSON function calling.
+- **Rencana Solusi Terarah**:
+  1. Transparansi Penuh (`generationMode: 'live-ai' | 'fallback-template'`): Event SSE dan UI chat menampilkan badge jelas jika mode cadangan aktif.
+  2. Prioritas Model Gemini: Pindahkan `gemini-3.5-flash` ke prioritas pertama dalam daftar kandidat failover, perpanjang timeout fetch ke 30s.
+  3. Strict Fallback Elimination: Menolak jatuh ke fallback diam-diam jika Custom AI gagal, melainkan memberikan laporan error yang eksplisit di antarmuka obrolan.
+
 ## 21. Eliminasi Masalah Fake & Realisasi Multi-Turn ReAct Coding
 - Mengatasi `malformed_function_call` pada LiteLLM dengan membersihkan schema parameter `tools.ts`.
 - Meniadakan fallback statis ketika AI kustom aktif, memastikan setiap kode di-generate berkas per berkas (`package.json`, `server.js`, `public/index.html`, `public/style.css`, `public/script.js`, `data/records.json`) secara riil selama ~65 detik dengan log terminal nyata.
@@ -257,3 +268,10 @@
 - Repositori Publik: **[https://github.com/rickyrizkymnf123-commits/vibecoder](https://github.com/rickyrizkymnf123-commits/vibecoder)**
 - Branch: `main` (73 berkas proyek termigrasi, bebas dari rahasia/token).
 - Dilengkapi template `.env.example` dan dokumentasi `README.md`.
+
+## 23. Implementasi Langkah 2 & 3: Anti-Silent Fallback & Prioritas Gemini 3.5
+- Urutan model aktif: `gemini-3.5-flash` -> `gemini-3.6-flash` -> `gemini-3.7-flash` dengan batas timeout 35 detik.
+- Rate-limit resilience: Auto-retry 6s pada HTTP 429 dan jeda pacing 3.2-4.5s antar-turn.
+- Custom AI: Fallback dinonaktifkan 100% jika `hasCustomAi === true`. Error asli dilaporkan transparan jika model kustom tidak memanggil tool.
+- Transparansi UI: Indikator `generationMode` terpasang pada live progress panel (`Mode Live AI` / `Mode Cadangan (Fallback)`) dan pada balasan chat asisten.
+

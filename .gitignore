@@ -31,7 +31,7 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
-data/ai_config.json
+data/ai_config.json*
 workspaces/
 cookies.txt
 tests/

@@ -14,6 +14,7 @@ import {
   ChevronDown,
   ChevronUp,
   AlertCircle,
+  AlertTriangle,
   HelpCircle,
   Copy,
   Check,
@@ -45,6 +46,8 @@ export default function ChatSessionPage() {
   const [deployedApp, setDeployedApp] = useState<GeneratedApp | null>(null);
   const [userSubdomain, setUserSubdomain] = useState<string>('demo');
   const [errorMessage, setErrorMessage] = useState('');
+  const [liveGenerationMode, setLiveGenerationMode] = useState<'live-ai' | 'fallback-template' | null>(null);
+  const [liveFallbackReason, setLiveFallbackReason] = useState<string>('');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -103,6 +106,8 @@ export default function ChatSessionPage() {
     setLiveTodos([]);
     setLiveToolCalls([]);
     setDeployedApp(null);
+    setLiveGenerationMode(null);
+    setLiveFallbackReason('');
 
     let currentSessionId = sessionId;
 
@@ -185,6 +190,13 @@ export default function ChatSessionPage() {
             } catch {
               eventData = dataMatch[1];
             }
+          }
+
+          if (eventData?.generationMode) {
+            setLiveGenerationMode(eventData.generationMode);
+          }
+          if (eventData?.fallbackReason) {
+            setLiveFallbackReason(eventData.fallbackReason);
           }
 
           if (eventType === 'plan') {
@@ -298,9 +310,22 @@ export default function ChatSessionPage() {
                 /* Assistant completed card (Clean VibeCoder style) */
                 <div className="flex justify-start">
                   <div className="max-w-3xl w-full bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 space-y-4 text-sm">
+                    {/* Mode Banner Indicator */}
+                    {m.content.includes('<!-- GENERATION_MODE: fallback-template -->') || m.content.includes('Mode Cadangan') ? (
+                      <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-amber-950/40 border border-amber-600/50 text-amber-300 text-xs">
+                        <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                        <span><strong>Mode Cadangan (Fallback Template):</strong> Sambungan ke Live AI sempat mengalami kendala kuota/timeout. Aplikasi di-generate menggunakan template cadangan.</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-emerald-950/40 border border-emerald-600/30 text-emerald-300 text-xs">
+                        <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span><strong>Mode AI Riil (Live Autonomous AI):</strong> Aplikasi dirancang dan dibangun secara bertahap menggunakan model AI aktif.</span>
+                      </div>
+                    )}
+
                     {/* Content Markdown */}
                     <div className="text-slate-200 leading-relaxed whitespace-pre-wrap font-sans text-xs sm:text-sm">
-                      {m.content}
+                      {m.content.replace(/<!-- GENERATION_MODE: [a-z-]+ -->\n?/, '')}
                     </div>
 
                     {/* Render historical tool calls if any */}
@@ -388,10 +413,36 @@ export default function ChatSessionPage() {
                 <Loader2 className="w-4 h-4 animate-spin text-violet-400" />
                 <span>AI Sedang Membangun Aplikasi Anda (10-Step Workflow)...</span>
               </div>
-              <span className="text-xs font-mono text-amber-400 bg-amber-950/50 px-2 py-0.5 rounded border border-amber-800/80">
-                In-Progress
-              </span>
+              <div className="flex items-center gap-2">
+                {liveGenerationMode === 'fallback-template' ? (
+                  <span className="text-[11px] font-semibold text-amber-300 bg-amber-950/80 px-2.5 py-1 rounded-full border border-amber-600/80 flex items-center gap-1.5 shadow-sm">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                    Mode Cadangan (Fallback)
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-semibold text-emerald-300 bg-emerald-950/80 px-2.5 py-1 rounded-full border border-emerald-600/80 flex items-center gap-1.5 shadow-sm">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                    Mode Live AI
+                  </span>
+                )}
+                <span className="text-xs font-mono text-amber-400 bg-amber-950/50 px-2 py-0.5 rounded border border-amber-800/80">
+                  In-Progress
+                </span>
+              </div>
             </div>
+
+            {/* Banner Transparan jika Mode Cadangan aktif */}
+            {liveGenerationMode === 'fallback-template' && (
+              <div className="p-3.5 rounded-xl bg-amber-950/40 border border-amber-600/50 text-xs text-amber-300 flex items-start gap-2.5">
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-amber-200">⚠️ Perhatian: Mode Cadangan (Fallback Template) Aktif</p>
+                  <p className="text-amber-300/90 mt-0.5">
+                    Sambungan ke Live AI sedang mengalami gangguan {liveFallbackReason ? `(${liveFallbackReason})` : ''}. Sistem secara transparan beralih ke generator cadangan agar aplikasi tetap dapat diuji.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Live Plan Narrative */}
             {livePlan && (
