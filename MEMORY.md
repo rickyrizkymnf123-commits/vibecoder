@@ -305,3 +305,9 @@
 - Menginjeksi `forge-api-bridge`: Virtual API interceptor yang mencegat request `fetch('/api/...')` dan `fetch('/data/...')` lalu memprosesnya secara lokal via `localStorage`. Ini membuat seluruh formulir, modal, mutasi, dan aksi tombol berfungsi 100% interaktif tanpa dependensi backend eksternal.
 - Dilengkapi `export const dynamic = 'force-dynamic'` dan header `Cache-Control: no-cache` agar update berkas selalu disajikan secara instan ke sandbox preview.
 
+### Follow-Up Chat Iterations (Modifikasi & Penambahan Fitur)
+- `lib/agent/loop.ts` mendeteksi berkas yang sudah ada di workspace (`isFollowUp`).
+- Saat pengguna meminta revisi di sesi obrolan (misal: ganti warna, ubah teks, tambah tombol/fitur baru), AI menerima konteks berkas yang ada, membaca berkas dengan `read_file`, dan memodifikasinya menggunakan `edit_file` atau `write_file` tanpa merusak fitur sebelumnya.
+- Otomatis melakukan `browser_test` dan mempublikasikan versi baru via `publish_app` sehingga live preview langsung ter-update.
+
+

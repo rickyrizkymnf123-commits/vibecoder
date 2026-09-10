@@ -705,3 +705,20 @@ Pengguna mengirim tangkapan layar antarmuka yang menunjukkan pembuatan aplikasi 
     - Verifikasi pergeseran ke `Portal Staf Lapangan` (Hidden state: `false`).
     - Verifikasi tangkapan layar visual fisik di `workspaces/admin-shot.png`, `workspaces/modal-sku-shot.png`, `workspaces/modal-mutasi-shot.png`, `workspaces/user-portal-shot.png`, dan `workspaces/preview-shell-shot.png`.
     - 100% interaksi tombol dan modal berfungsi dengan mulus dan responsif.
+
+- **Konfirmasi Jaminan Generasi Aplikasi Mandiri Masa Depan**:
+## 31. Sesi 27: Dukungan Penuh Obrolan Lanjutan (Follow-Up Iterasi, Ganti Warna & Tambah Fitur)
+- **Pertanyaan Pengguna**:
+  - Apakah setelah melihat preview, pengguna bisa meminta perubahan (misal: ganti warna Landing Page, tambah tombol/fitur baru, ubah tata letak) langsung di obrolan dan AI akan menuruti permintaan tersebut?
+- **Implementasi & Peningkatan**:
+  - Di `lib/agent/loop.ts`, ditambahkan deteksi cerdas `isFollowUp` yang memindai berkas fisik yang sudah ada di workspace `workspaces/[sessionId]`.
+  - Jika sesi merupakan kelanjutan dari aplikasi yang sudah ada:
+    1. AI tidak lagi menulis ulang aplikasi dari nol, melainkan menerima daftar berkas yang ada.
+    2. Prompt sistem mengarahkan AI untuk memfokuskan perubahan pada berkas spesifik (misal: `public/index.html`, `public/css/style.css`, atau `public/js/app.js`).
+    3. AI menggunakan `read_file` untuk membaca konteks berkas yang ingin diubah, lalu `edit_file` / `write_file` untuk memperbarui berkas tanpa merusak fitur-fitur yang sudah bekerja.
+    4. AI menjalankan `browser_test` untuk memastikan perubahan bebas error, dan memanggil `publish_app` untuk memperbarui live preview secara seketika.
+- **Status Commit & Push**:
+  - Commit `4e07133`: *feat: support follow-up chat iterations, style customisation, and feature additions on existing projects* telah di-push ke GitHub `main`.
+
+
+
