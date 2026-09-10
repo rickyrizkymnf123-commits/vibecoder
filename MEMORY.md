@@ -275,3 +275,7 @@
 - Custom AI: Fallback dinonaktifkan 100% jika `hasCustomAi === true`. Error asli dilaporkan transparan jika model kustom tidak memanggil tool.
 - Transparansi UI: Indikator `generationMode` terpasang pada live progress panel (`Mode Live AI` / `Mode Cadangan (Fallback)`) dan pada balasan chat asisten.
 
+
+## Vercel & Domain Cleanup
+- 4 Proyek uji coba di Vercel (`forge-kasir-stok-kelontong`, `vibecoder-sembako-kasir-pintar`, `vibecoder-sewa-mobil-cepat`, `vibecoder-armada-rental`) telah dihapus secara permanen via Vercel REST API.
+- Tabel `apps` di Supabase telah dibersihkan sehingga halaman `/domains` bersih kembali tanpa entri kustom lama.

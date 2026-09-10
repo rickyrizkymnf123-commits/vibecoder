@@ -16,6 +16,17 @@ const DEFAULT_CONFIG: AiConfig = {
   defaultModel: process.env.AI_DEFAULT_MODEL || 'gemini-2.5-flash'
 };
 
+export function sanitizeApiKey(key: string): string {
+  if (!key) return '';
+  let cleaned = key.trim();
+  // Detect accidental duplicate paste (e.g., sk-...sk-...)
+  const secondSk = cleaned.indexOf('sk-', 2);
+  if (secondSk !== -1) {
+    cleaned = cleaned.substring(0, secondSk).trim();
+  }
+  return cleaned;
+}
+
 export function getAiConfig(): AiConfig {
   try {
     if (fs.existsSync(CONFIG_FILE)) {
@@ -23,7 +34,7 @@ export function getAiConfig(): AiConfig {
       const parsed = JSON.parse(data);
       return {
         baseUrl: parsed.baseUrl || DEFAULT_CONFIG.baseUrl,
-        apiKey: parsed.apiKey || DEFAULT_CONFIG.apiKey,
+        apiKey: sanitizeApiKey(parsed.apiKey || DEFAULT_CONFIG.apiKey),
         defaultModel: parsed.defaultModel || DEFAULT_CONFIG.defaultModel,
         updatedAt: parsed.updatedAt
       };
@@ -31,14 +42,17 @@ export function getAiConfig(): AiConfig {
   } catch (err) {
     console.warn('Failed to read ai_config.json, using default:', err);
   }
-  return { ...DEFAULT_CONFIG };
+  return { ...DEFAULT_CONFIG, apiKey: sanitizeApiKey(DEFAULT_CONFIG.apiKey) };
 }
 
 export function saveAiConfig(newConfig: Partial<AiConfig>): AiConfig {
   const current = getAiConfig();
+  const rawKey = newConfig.apiKey !== undefined ? newConfig.apiKey : current.apiKey;
+  const cleanedKey = sanitizeApiKey(rawKey);
+
   const updated: AiConfig = {
     baseUrl: (newConfig.baseUrl !== undefined ? newConfig.baseUrl : current.baseUrl).trim(),
-    apiKey: (newConfig.apiKey !== undefined ? newConfig.apiKey : current.apiKey).trim(),
+    apiKey: cleanedKey,
     defaultModel: (newConfig.defaultModel !== undefined ? newConfig.defaultModel : current.defaultModel).trim(),
     updatedAt: new Date().toISOString()
   };
@@ -68,8 +82,9 @@ export async function fetchModelsFromProvider(baseUrl: string, apiKey: string): 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json'
   };
-  if (apiKey) {
-    headers['Authorization'] = `Bearer ${apiKey}`;
+  const cleanKey = sanitizeApiKey(apiKey);
+  if (cleanKey) {
+    headers['Authorization'] = `Bearer ${cleanKey}`;
   }
 
   try {

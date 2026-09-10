@@ -597,3 +597,19 @@
   - `CONVERSATION_LOG.md` & `MEMORY.md`.
 - **Tautan Repositori**: **[https://github.com/rickyrizkymnf123-commits/vibecoder](https://github.com/rickyrizkymnf123-commits/vibecoder)**
 
+
+## 26. Sesi 22: Pembersihan Proyek Vercel dan Reset Entri Aplikasi di Halaman Domain
+- **Permintaan Pengguna**:
+  1. Hapus 4 proyek lama yang terdaftar di Vercel:
+     - `forge-kasir-stok-kelontong`
+     - `vibecoder-sembako-kasir-pintar`
+     - `vibecoder-sewa-mobil-cepat`
+     - `vibecoder-armada-rental`
+  2. Hapus seluruh domain/daftar aplikasi target di halaman `/domains` (sebelumnya ada 23 entri aplikasi draft yang mengotori daftar).
+- **Aksi yang Dijalankan**:
+  1. Melakukan pemanggilan Vercel API v9 DELETE ke 4 proyek target menggunakan `VERCEL_TOKEN`. Seluruh 4 proyek berhasil dihapus dengan status HTTP 204. Proyek produksi lain milik pengguna tetap terjaga aman.
+  2. Melakukan pembersihan tabel `apps` di Supabase: 23 data aplikasi draft berhasil dihapus bersih (sisa 0).
+  3. Memperbaiki sanitasi penempelan kunci API (`sanitizeApiKey` di `lib/ai/config.ts`) untuk mencegah duplikasi token seperti `sk-...sk-...`.
+- **Hasil**:
+  - Halaman `/domains` kini bersih tanpa sisa entri lama.
+  - Dashboard Vercel bersih dari 4 proyek percobaan.
