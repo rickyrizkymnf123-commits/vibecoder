@@ -68,7 +68,7 @@ function FormattedMessage({ content }: { content: string }) {
           <a
             key={match.index}
             href={url}
-            target={url.startsWith('http') ? '_blank' : undefined}
+            target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 font-semibold text-indigo-400 hover:text-indigo-300 underline decoration-indigo-500/50 underline-offset-2 transition-colors mx-0.5"
           >

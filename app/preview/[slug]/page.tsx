@@ -76,8 +76,8 @@ export default function AppPreviewPage() {
         <div className="max-w-md w-full bg-[#131926] border border-white/10 rounded-2xl p-8 text-center">
           <h2 className="text-xl font-bold text-red-400 mb-2">Aplikasi Tidak Ditemukan</h2>
           <p className="text-zinc-400 text-sm mb-6">Aplikasi dengan slug &quot;{slug}&quot; belum terdaftar atau masih dalam proses pembuatan.</p>
-          <Link href="/dashboard" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-semibold text-sm transition">
-            <ArrowLeft className="w-4 h-4" /> Kembali ke Dashboard
+          <Link href="/c/new" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-semibold text-sm transition">
+            <ArrowLeft className="w-4 h-4" /> Kembali ke Tools
           </Link>
         </div>
       </div>
@@ -100,13 +100,19 @@ export default function AppPreviewPage() {
       {/* Top Navigation Bar */}
       <header className="h-16 border-b border-white/10 bg-[#0E131F]/90 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between gap-4 sticky top-0 z-30">
         <div className="flex items-center gap-3 min-w-0">
-          <Link
-            href="/dashboard"
+          <button
+            onClick={() => {
+              if (typeof window !== 'undefined' && window.history.length > 1 && document.referrer && document.referrer.includes(window.location.host)) {
+                window.history.back();
+              } else {
+                window.location.href = '/c/new';
+              }
+            }}
             className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white transition flex-shrink-0"
-            title="Kembali ke Dashboard"
+            title="Kembali ke Tools"
           >
             <ArrowLeft className="w-4 h-4" />
-          </Link>
+          </button>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <h1 className="text-sm font-bold text-white truncate">{appData.name}</h1>

@@ -83,31 +83,94 @@ Setiap aplikasi yang Anda bangun BUKAN sekadar halaman satu tampilan sederhana, 
    - Log Audit / Riwayat Aktivitas sistem.
 
 5. **RELATIONAL DATA & PERSISTENSI NYATA**:
-   - Struktur database yang dipikirkan matang di 'lib/storage.js' atau 'data/*.json' dengan relasi antar tabel (Tabel Users/Pengguna, Tabel Master Entitas, Tabel Riwayat Transaksi).
+   - Struktur database yang dipikirkan matang di 'lib/db.js' atau 'lib/storage.js' atau 'data/*.json' dengan relasi antar tabel (Tabel Users/Pengguna, Tabel Master Entitas, Tabel Riwayat Transaksi, Tabel Audit Logs).
    - Sediakan Dataset Awal (Seed Data) yang realistis, bervariasi, berbahasa Indonesia, dan menggunakan mata uang Rupiah.
 
-STRUKTUR BERKAS WAJIB DIBUAT DENGAN 'write_file':
-- 'package.json': Konfigurasi aplikasi Node/Express jika backend aktif.
-- 'data/dataset.json' atau 'lib/storage.js': Data seed relasional dan helper penyimpanan.
-- 'server.js': REST API backend Express yang menangani routing, data CRUD, dan serving berkas statis (gunakan port 4000-4999 atau proses fleksibel).
-- 'public/index.html': Antarmuka HTML modern dengan View Switcher (Landing Page view, Auth Modal, User Dashboard view, Admin Dashboard view), Tailwind CSS CDN, Lucide Icons, dan Chart.js CDN.
-- 'public/css/style.css': Desain modern berkelas SaaS (dark/light theme accents, rounded corners, glassmorphism, animasi transisi halus).
-- 'public/js/app.js': Logika aplikasi modular (State management, Client-side router/view switcher, Event listeners, CRUD API handlers, Chart rendering).
-- 'test/app-test.js': Skrip uji fungsional terminal untuk memverifikasi API dan integritas data.
+PROTOKOL EKSEKUSI OTONOM VIBECODER 5-FASE (STANDAR 50+ TOOL CALLS):
+Anda WAJIB mengeksekusi pembuatan aplikasi secara berurutan melewati 5 FASE OTONOM. JANGAN PERNAH melompat langsung ke 'publish_app' sebelum menyelesaikan dan memvalidasi setiap fase!
 
-ALUR KERJA RE-ACT (Reasoning + Action) MUTLAK:
-1. **Perencanaan Awal**:
-   - Berikan penalaran tentang fitur dan arsitektur (Landing, Auth, User & Admin roles).
-   - Panggil 'todo_write' untuk membuat checklist tugas terstruktur (6-9 tahapan logis).
-2. **Coding Nyata & Bertahap**:
-   - Tulis seluruh berkas fisik di atas satu per satu menggunakan 'write_file'. JANGAN pernah gunakan placeholder atau komentar TODO kosong.
-3. **Pemeriksaan & Pengujian Nyata**:
-   - Gunakan 'bash' untuk memeriksa sintaks: 'node --check server.js' dan jalankan pengujian 'node test/app-test.js'.
-   - Gunakan tool 'browser_test' untuk menjalankan verifikasi visual di headless Google Chrome (persis seperti yang dilakukan VibeCoder): membuka antarmuka web di browser fisik, mengeklik tombol, memvalidasi 0 console error, dan memotret screenshot visual UI.
-   - JIKA ADA ERROR: Baca error stderr, analisis penyebabnya, dan gunakan 'edit_file' atau 'write_file' untuk memperbaikinya sendiri sampai berhasil.
-4. **Penerbitan Aplikasi**:
-   - Panggil tool 'publish_app' dengan 'appName' dan 'slug'.
-   - Berikan rangkuman akhir fitur lengkap dan akun demo untuk login.`;
+FASE 1: DISCOVERY & INSPEKSI LINGKUNGAN AWAL (BASH & TODO_WRITE)
+- Jalankan 'bash' untuk memeriksa direktori kerja dan lingkungan runtime: 'pwd && ls -la', 'node -v', 'npm -v'.
+- Panggil 'todo_write' untuk menetapkan 7-9 item tugas pengerjaan terstruktur (Desain arsitektur & schema, Helper utils, REST backend API, CSS styling SaaS, JS client store & charts, HTML view switcher & forms, E2E tests, Headless browser visual verification, Deployment).
+
+FASE 2: MODULAR GRANULAR SCAFFOLDING (WRITE_FILE BERKAS DEMI BERKAS)
+- Bangun aplikasi secara modular, berkas demi berkas. JANGAN pernah menggabungkan seluruh kode menjadi satu file monolith raksasa!
+- Tulis berkas-berkas berikut secara bertahap menggunakan 'write_file':
+  1. 'package.json': Definisi metadata proyek dan start script.
+  2. 'lib/util.js': Helper fungsi (format Rupiah 'Rp', sanitasi input, generator ID unik, filter tanggal).
+  3. 'lib/db.js' atau 'lib/storage.js': Relational in-memory/JSON store dengan relasi tabel dan dataset awal Indonesia.
+  4. 'server.js': REST API Express lengkap (endpoints auth, CRUD master data, statistik ringkasan, static file serving).
+  5. 'public/css/style.css': Desain CSS modern berkelas SaaS (dark/light mode accents, glassmorphism, responsive layout).
+  6. 'public/js/app.js': Logika aplikasi modular sisi klien (state store, auth session, view switcher, API caller, modal dialog handler, render tabel CRUD, render Chart.js).
+  7. 'public/index.html': Antarmuka HTML modern lengkap dengan isolasi header mutlak (Landing Page publik untuk Tamu, Form/Modal Auth, User Dashboard, Admin Dashboard dengan KPI cards & Chart.js, form modal Tambah/Edit).
+  8. 'test/e2e.js': Skrip uji fungsional otomatis untuk memeriksa integritas data dan endpoint backend.
+
+FASE 3: TDD, SINTAKS & AUTO-REPAIR (BASH & EDIT_FILE)
+- Jalankan 'bash': 'node --check server.js' untuk memastikan tidak ada kesalahan sintaks backend.
+- Jalankan 'bash': 'node test/e2e.js' atau panggil tool 'run_tests' untuk memverifikasi logika bisnis dan API.
+- MEKANISME AUTO-REPAIR: Jika ada test yang gagal atau ada error sintaks, baca pesan error, analisis akar masalahnya, gunakan 'edit_file' atau 'write_file' untuk memperbaikinya, dan jalankan ulang pengujian hingga SEMUA tes lolos (0 failed).
+
+FASE 4: VERIFIKASI VISUAL HEADLESS BROWSER (BROWSER_TEST)
+- Panggil tool 'browser_test' untuk membuka aplikasi web di browser fisik (Google Chrome).
+- Lakukan interaksi klik tombol, verifikasi konsol JavaScript bersih (0 console error), dan pastikan navigasi Landing Page vs Dashboard terisolasi dengan rapi.
+
+FASE 5: FINALISASI & PENERBITAN (PUBLISH_APP)
+- Hanya setelah Fase 1 s/d 4 selesai dan terverifikasi sempurna, panggil tool 'publish_app' dengan 'appName' dan 'slug'.
+- Berikan pesan ringkasan akhir yang ramah, profesional, dan bersih tanpa simbol markdown mentah yang berantakan.`;
+
+function getNextStepGuidance(writtenFiles: string[], toolCallsHistory: ToolCallItem[]): string {
+  const getCommand = (tc: ToolCallItem): string => {
+    if (!tc.input) return '';
+    if (typeof tc.input === 'string') return tc.input;
+    if (typeof tc.input === 'object' && 'command' in tc.input) return String(tc.input.command || '');
+    return '';
+  };
+
+  const hasTodo = toolCallsHistory.some((tc) => tc.tool === 'todo_write');
+  const hasBashDiscovery = toolCallsHistory.some(
+    (tc) =>
+      tc.tool === 'bash' &&
+      (getCommand(tc).includes('pwd') ||
+        getCommand(tc).includes('node -v') ||
+        getCommand(tc).includes('ls'))
+  );
+  const hasServer = writtenFiles.some((f) => f.includes('server.js'));
+  const hasHtml = writtenFiles.some((f) => f.includes('index.html'));
+  const hasJs = writtenFiles.some((f) => f.includes('app.js'));
+  const hasCss = writtenFiles.some((f) => f.includes('style.css'));
+  const hasDb = writtenFiles.some((f) => f.includes('db.js') || f.includes('storage.js') || f.includes('util.js'));
+  const hasTestScript = writtenFiles.some((f) => f.includes('test'));
+  const hasRunBashTest = toolCallsHistory.some(
+    (tc) =>
+      tc.tool === 'bash' &&
+      (getCommand(tc).includes('node test') || getCommand(tc).includes('node --check'))
+  );
+  const hasBrowserTest = toolCallsHistory.some((tc) => tc.tool === 'browser_test');
+
+  if (!hasBashDiscovery || !hasTodo) {
+    return 'Lanjutkan ke Fase 1: Periksa lingkungan kerja dengan tool bash ("pwd && ls -la", "node -v") dan susun rencana tugas terstruktur menggunakan tool todo_write.';
+  }
+
+  if (!hasDb || !hasServer || !hasHtml || !hasJs || !hasCss) {
+    const missing: string[] = [];
+    if (!hasDb) missing.push('lib/util.js & lib/db.js');
+    if (!hasServer) missing.push('server.js');
+    if (!hasCss) missing.push('public/css/style.css');
+    if (!hasJs) missing.push('public/js/app.js');
+    if (!hasHtml) missing.push('public/index.html');
+    return `Lanjutkan ke Fase 2: Tulis berkas modular berikutnya menggunakan write_file (${missing.join(', ')}). Pastikan setiap berkas berisi kode nyata yang lengkap dan fungsional.`;
+  }
+
+  if (!hasTestScript || !hasRunBashTest) {
+    return 'Lanjutkan ke Fase 3: Buat berkas skrip pengujian "test/e2e.js" (jika belum ada), lalu jalankan "node --check server.js" dan "node test/e2e.js" via tool bash. Jika ada kesalahan, perbaiki kode dengan edit_file hingga lolos.';
+  }
+
+  if (!hasBrowserTest) {
+    return 'Lanjutkan ke Fase 4: Jalankan verifikasi visual antarmuka web di Google Chrome menggunakan tool browser_test untuk memastikan tampilan responsif dan tidak ada error console JavaScript.';
+  }
+
+  return 'Semua fase pengembangan, pengujian, dan verifikasi visual telah selesai dengan sukses! Sekarang lanjutkan ke Fase 5: Terbitkan aplikasi menggunakan tool publish_app dan berikan ringkasan akhir yang bersih serta profesional.';
+}
 
 function getOptimizedMessages(rawMessages: any[]): any[] {
   return rawMessages.map((m, idx) => {
@@ -294,6 +357,15 @@ ATURAN WAJIB UNTUK PERUBAHAN / ITERASI:
       resultOutput = await executeRunTests(sessionId, args.test_type);
       await recordToolFinish(tc, resultOutput, resultOutput.status === 'passed' ? 'completed' : 'failed');
     } else if (name === 'publish_app') {
+      if (writtenFiles.length < 3) {
+        resultOutput = {
+          success: false,
+          error: `Aplikasi belum lengkap (baru ${writtenFiles.length} berkas dibuat). Harap selesaikan seluruh berkas modular di Fase 2, jalankan pengujian di Fase 3, dan verifikasi visual di Fase 4 sebelum memanggil publish_app.`
+        };
+        const tc = await recordToolStart('publish_app', `Validasi kelengkapan sebelum menerbitkan "${args.appName}"`, args);
+        await recordToolFinish(tc, resultOutput, 'failed');
+        return resultOutput;
+      }
       const tc = await recordToolStart('publish_app', `Menerbitkan aplikasi "${args.appName}"`, args);
       const pub = await executePublishApp(sessionId, userId, args.appName, args.slug, hasAppCredit);
       deployedApp = pub.app;
@@ -347,7 +419,7 @@ ATURAN WAJIB UNTUK PERUBAHAN / ITERASI:
     ];
 
     let turn = 0;
-    const MAX_TURNS = 20;
+    const MAX_TURNS = 60;
 
     while (turn < MAX_TURNS && !deployedApp) {
       turn++;
@@ -480,15 +552,11 @@ ATURAN WAJIB UNTUK PERUBAHAN / ITERASI:
           });
         }
       } else {
-        if (turn < 3 && !deployedApp && writtenFiles.length === 0) {
+        if (!deployedApp) {
+          const nextGuidance = getNextStepGuidance(writtenFiles, toolCallsHistory);
           messages.push({
             role: 'user',
-            content: 'Rencana sangat bagus. Sekarang silakan langsung mulai menulis berkas fisik aplikasi (package.json, server.js, public/index.html, dll.) menggunakan tool write_file, lakukan uji sintaks via bash, dan terbitkan dengan publish_app.'
-          });
-        } else if (writtenFiles.length > 0 && !deployedApp) {
-          messages.push({
-            role: 'user',
-            content: 'Berkas telah ditulis. Sekarang silakan periksa sintaks via tool bash (node --check server.js) dan terbitkan aplikasi menggunakan tool publish_app.'
+            content: nextGuidance
           });
         } else {
           break;
@@ -524,7 +592,7 @@ ATURAN WAJIB UNTUK PERUBAHAN / ITERASI:
       await onEvent({ type: 'todo', todoList, generationMode: 'live-ai' });
     }
 
-    const finalSummary = summaryMessage || (deployedApp ? `Aplikasi **${deployedApp.name}** telah selesai dibangun dan siap digunakan!` : 'Proses pembuatan aplikasi selesai.');
+    const finalSummary = summaryMessage || (deployedApp ? `Aplikasi ${deployedApp.name} telah selesai dibangun dan siap digunakan!` : 'Proses pembuatan aplikasi selesai.');
     await onEvent({ type: 'complete', app: deployedApp, message: finalSummary, generationMode: 'live-ai' });
 
     return {
@@ -557,7 +625,7 @@ ATURAN WAJIB UNTUK PERUBAHAN / ITERASI:
   ];
 
   let geminiTurn = 0;
-  const MAX_GEMINI_TURNS = 20;
+  const MAX_GEMINI_TURNS = 60;
 
   while (geminiTurn < MAX_GEMINI_TURNS && !deployedApp) {
     geminiTurn++;
@@ -651,15 +719,11 @@ ATURAN WAJIB UNTUK PERUBAHAN / ITERASI:
         parts: toolResponseParts
       });
     } else {
-      if (geminiTurn < 3 && !deployedApp && writtenFiles.length === 0) {
+      if (!deployedApp) {
+        const nextGuidance = getNextStepGuidance(writtenFiles, toolCallsHistory);
         contents.push({
           role: 'user',
-          parts: [{ text: 'Bagus. Sekarang mulai buat berkas fisik aplikasi menggunakan tool write_file, lakukan verifikasi sintaks via bash, dan terbitkan dengan publish_app.' }]
-        });
-      } else if (writtenFiles.length > 0 && !deployedApp) {
-        contents.push({
-          role: 'user',
-          parts: [{ text: 'Berkas telah ditulis. Silakan verifikasi sintaks via tool bash (node --check server.js) dan terbitkan aplikasi menggunakan tool publish_app.' }]
+          parts: [{ text: nextGuidance }]
         });
       } else {
         break;
@@ -695,7 +759,7 @@ ATURAN WAJIB UNTUK PERUBAHAN / ITERASI:
     await onEvent({ type: 'todo', todoList, generationMode: 'live-ai' });
   }
 
-  const finalSummary = summaryMessage || (deployedApp ? `Aplikasi **${deployedApp.name}** telah selesai dibangun dan siap digunakan!` : 'Proses pembuatan aplikasi selesai.');
+  const finalSummary = summaryMessage || (deployedApp ? `Aplikasi ${deployedApp.name} telah selesai dibangun dan siap digunakan!` : 'Proses pembuatan aplikasi selesai.');
   await onEvent({ type: 'complete', app: deployedApp, message: finalSummary, generationMode: 'live-ai' });
 
   return {

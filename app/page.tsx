@@ -23,12 +23,12 @@ export default function LandingPage() {
       {/* Navigation */}
       <header className="sticky top-0 z-50 backdrop-blur-md bg-[#0b0f19]/80 border-b border-slate-800/80">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-violet-600 to-fuchsia-500 flex items-center justify-center shadow-lg shadow-violet-500/30">
-              <Sparkles className="w-5 h-5 text-white" />
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-yellow-300 flex items-center justify-center shadow-lg shadow-amber-500/30 animate-lightning">
+              <Zap className="w-5 h-5 text-slate-950 fill-slate-950" />
             </div>
-            <span className="text-xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-200 to-violet-300">
-              Forge
+            <span className="text-xl font-extrabold tracking-tight font-lightning">
+              Kilat Tools
             </span>
           </div>
 

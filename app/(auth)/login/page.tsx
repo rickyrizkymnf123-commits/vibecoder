@@ -3,7 +3,9 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Sparkles, ArrowRight, ShieldAlert, Loader2 } from 'lucide-react';
+import { Sparkles, ArrowRight, ShieldAlert, Loader2, Zap } from 'lucide-react';
+
+import { KilatLogo } from '@/components/KilatLogo';
 
 export default function PlatformLoginPage() {
   const [identifier, setIdentifier] = useState('');
@@ -49,15 +51,10 @@ export default function PlatformLoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 bg-[#0b0f19] relative">
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-violet-600/15 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
 
       <div className="w-full max-w-md bg-slate-900/80 border border-slate-800 backdrop-blur-xl p-8 rounded-2xl shadow-2xl relative z-10">
-        <div className="flex items-center gap-2 mb-6">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-violet-600 to-fuchsia-500 flex items-center justify-center shadow-md shadow-violet-500/30">
-            <Sparkles className="w-4 h-4 text-white" />
-          </div>
-          <span className="text-lg font-extrabold text-white">Forge</span>
-        </div>
+        <KilatLogo size="lg" className="mb-6" />
 
         <h2 className="text-2xl font-bold text-white tracking-tight">Masuk ke Akun Anda</h2>
         <p className="text-sm text-slate-400 mt-1">Lanjutkan pembuatan dan pengelolaan aplikasi web Anda</p>

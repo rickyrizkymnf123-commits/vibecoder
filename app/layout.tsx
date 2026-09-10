@@ -2,9 +2,9 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Forge — Bangun & Publish Aplikasi Web Apapun Lewat Chat AI',
-  description: 'Platform AI SaaS App Generator terunggul. Cukup deskripsikan aplikasi dalam bahasa natural, AI akan merencanakan, membangun modul, menguji 16 skenario in-process, dan mem-publish live ke URL publik secara instan.',
-  keywords: ['ai app builder', 'forge', 'nextjs', 'supabase', 'vercel']
+  title: 'Kilat Tools — Bangun & Publish Aplikasi Web Secepat Kilat Lewat Chat AI',
+  description: 'Platform AI SaaS App Generator super cepat. Cukup deskripsikan aplikasi dalam bahasa natural, AI Kilat Tools akan merencanakan, membangun modul, menguji skenario in-process, dan mem-publish live ke URL publik secara instan.',
+  keywords: ['kilat tools', 'ai app builder', 'vibecoder', 'nextjs', 'supabase', 'vercel']
 };
 
 export default function RootLayout({

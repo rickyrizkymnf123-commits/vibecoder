@@ -19,9 +19,11 @@ import {
   X,
   Trash2,
   Mail,
-  Star
+  Star,
+  Zap
 } from 'lucide-react';
 import { UserProfile, ChatSession } from '@/lib/types';
+import { KilatLogo } from '@/components/KilatLogo';
 
 function formatRelativeTime(dateStr?: string) {
   if (!dateStr) return '';
@@ -198,14 +200,14 @@ export default function DashboardLayout({
     if (pathname === '/apps') return 'Aplikasi Ter-publish';
     if (pathname === '/storage') return 'Storage Pribadi';
     if (pathname === '/account') return 'Akun & Mutasi';
-    return 'Forge Studio';
+    return 'Kilat Tools';
   };
 
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0b0f19] flex items-center justify-center text-slate-400 text-sm">
-        <Sparkles className="w-5 h-5 text-violet-500 animate-spin mr-2" />
-        Memuat dasbor Forge...
+        <Zap className="w-5 h-5 text-amber-400 fill-amber-400 animate-lightning mr-2" />
+        Memuat dasbor Kilat Tools...
       </div>
     );
   }
@@ -222,11 +224,8 @@ export default function DashboardLayout({
           >
             <Menu className="w-5 h-5" />
           </button>
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-violet-600 to-fuchsia-500 flex items-center justify-center shadow-md shadow-violet-500/20">
-              <Sparkles className="w-3.5 h-3.5 text-white" />
-            </div>
-            <span className="text-sm font-bold text-white tracking-tight">Forge</span>
+          <Link href="/" className="flex items-center">
+            <KilatLogo size="sm" />
           </Link>
         </div>
 
@@ -241,9 +240,9 @@ export default function DashboardLayout({
           </Link>
           <Link
             href="/billing"
-            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-900 border border-slate-800 text-[11px] font-semibold text-violet-300"
+            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-900 border border-slate-800 text-[11px] font-semibold text-amber-300"
           >
-            <Cpu className="w-3 h-3 text-violet-400" />
+            <Zap className="w-3 h-3 text-amber-400 fill-amber-400" />
             <span>{user?.ai_credits ? Math.round(user.ai_credits / 1000) : 0}k</span>
           </Link>
           {user?.is_pro && (
@@ -271,11 +270,8 @@ export default function DashboardLayout({
         {/* Top brand & Credit Balances */}
         <div className="p-4 border-b border-slate-800/80">
           <div className="flex items-center justify-between mb-4">
-            <Link href="/" className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-violet-600 to-fuchsia-500 flex items-center justify-center shadow-md shadow-violet-500/20">
-                <Sparkles className="w-4 h-4 text-white" />
-              </div>
-              <span className="text-base font-bold text-white tracking-tight">Forge</span>
+            <Link href="/" className="flex items-center group">
+              <KilatLogo size="md" />
             </Link>
 
             <div className="flex items-center gap-2">
@@ -426,87 +422,100 @@ export default function DashboardLayout({
 
       {/* Main Content Area (100dvh safe) */}
       <main className="flex-1 h-[calc(100dvh-53px)] md:h-[100dvh] overflow-hidden bg-[#0b0f19] flex flex-col">
-        {/* Top Navbar Header (Alignment with Gambar 1-6) */}
-        <header className="px-4 py-2.5 border-b border-slate-800/80 bg-slate-950/70 backdrop-blur-md flex items-center justify-between shrink-0 z-20">
-          {/* Left: Active Session Title */}
-          <div className="flex items-center gap-2.5 truncate max-w-[280px] sm:max-w-md">
-            <div className="w-2 h-2 rounded-full bg-violet-400 animate-pulse shrink-0 hidden sm:block" />
-            <h1 className="text-xs sm:text-sm font-bold text-white tracking-tight truncate">
+        {/* Top Navbar Header (Balanced Spacious Layout: Left Title, Center Live App & Credits, Right Tools) */}
+        <header className="px-6 sm:px-8 py-3 border-b border-slate-800/80 bg-slate-950/85 backdrop-blur-md flex items-center justify-between gap-4 shrink-0 z-20">
+          {/* Left: Active Session Title (No Duplicate Logo here) */}
+          <div className="flex items-center gap-2.5 truncate min-w-0 max-w-[200px] sm:max-w-xs">
+            <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse shrink-0" />
+            <h1 className="text-xs sm:text-sm font-semibold text-slate-200 tracking-tight truncate">
               {getCurrentTitle()}
             </h1>
           </div>
 
-          {/* Right: Horizontal Menu */}
-          <div className="flex items-center gap-1.5 sm:gap-2 text-xs font-medium shrink-0">
-            {/* ↗ [subdomain].forge.dev / Live Preview Button */}
+          {/* Center: Live App Preview & Resource Badges (Prominently in the middle) */}
+          <div className="hidden md:flex items-center gap-3">
+            {/* Live App Preview Pill */}
             <a
               href={latestApp ? `/preview/${latestApp.slug}` : `/preview/gudangku-inventori-stok`}
               target="_blank"
               rel="noreferrer"
               title={latestApp ? `Buka Live Preview: ${latestApp.name}` : 'Buka Live Preview Aplikasi'}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-violet-950/40 hover:bg-violet-900/60 border border-violet-700/50 hover:border-violet-500 text-[11px] font-mono text-violet-200 hover:text-white transition-all shadow-sm group"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 hover:border-amber-500/50 text-slate-200 hover:text-white transition-all shadow-sm group font-mono text-[11px]"
             >
-              <span className="text-violet-400 group-hover:text-violet-300 font-bold">↗</span>
-              <span className="font-semibold text-white">
-                {latestApp ? `${latestApp.slug}.forge.dev` : `${user?.subdomain || 'demo'}.forge.dev`}
+              <Zap className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+              <span className="font-semibold text-slate-200 group-hover:text-amber-300">
+                {latestApp ? `${latestApp.slug}.kilattools.dev` : `${user?.subdomain || 'demo'}.kilattools.dev`}
               </span>
-              <span className="hidden sm:inline text-[9px] px-1.5 py-0.5 rounded bg-violet-600/30 text-violet-300 border border-violet-500/30 font-sans uppercase font-bold tracking-wider">
-                Live App
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-sans uppercase font-bold tracking-wider">
+                LIVE APP
               </span>
             </a>
 
-            {/* 🌐 Domain */}
+            {/* Combined Resource Badges */}
+            <div className="flex items-center bg-slate-900/90 border border-slate-800/80 rounded-xl p-0.5 shadow-inner">
+              <Link
+                href="/billing"
+                title="Kredit Slot Aplikasi"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg hover:bg-slate-800 text-amber-300 text-[11px] font-semibold transition-colors"
+              >
+                <span>🗂</span>
+                <span className="text-slate-400 font-normal">App:</span>
+                <span>{user?.app_credits ?? 0}</span>
+              </Link>
+              <div className="w-[1px] h-3.5 bg-slate-800" />
+              <Link
+                href="/billing"
+                title="Kredit Token AI"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg hover:bg-slate-800 text-yellow-300 text-[11px] font-semibold transition-colors"
+              >
+                <Zap className="w-3 h-3 text-amber-400 fill-amber-400" />
+                <span className="text-slate-400 font-normal">AI:</span>
+                <span>{user?.ai_credits ? Math.round(user.ai_credits / 1000) : 0}k</span>
+              </Link>
+            </div>
+          </div>
+
+          {/* Right: Quick Nav & Actions (Comfortably spaced on the right) */}
+          <div className="flex items-center gap-2 sm:gap-2.5 ml-auto md:ml-0 text-xs font-medium shrink-0">
+            {/* Mobile Fallback for App Pill */}
+            <a
+              href={latestApp ? `/preview/${latestApp.slug}` : `/preview/gudangku-inventori-stok`}
+              target="_blank"
+              rel="noreferrer"
+              className="md:hidden flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-[11px] font-mono text-slate-200"
+            >
+              <Zap className="w-3 h-3 text-amber-400" />
+              <span>Live App</span>
+            </a>
+
             <Link
               href="/domains"
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border transition-colors ${
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-[11px] transition-colors ${
                 pathname === '/domains'
-                  ? 'bg-violet-600/20 text-violet-300 border-violet-500/30'
-                  : 'bg-slate-900/60 hover:bg-slate-800 border-slate-800 text-slate-300'
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                  : 'bg-slate-900/70 hover:bg-slate-800 border-slate-800 text-slate-300'
               }`}
             >
               <span>🌐</span>
               <span className="hidden sm:inline">Domain</span>
             </Link>
 
-            {/* ⭐ Pro */}
             <Link
               href="/pro"
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border transition-colors ${
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-[11px] transition-colors ${
                 pathname === '/pro'
-                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
-                  : 'bg-slate-900/60 hover:bg-slate-800 border-slate-800 text-amber-400'
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                  : 'bg-slate-900/70 hover:bg-slate-800 border-slate-800 text-amber-400'
               }`}
             >
-              <span>⭐</span>
+              <Crown className="w-3 h-3 text-amber-400" />
               <span className="hidden sm:inline">Pro</span>
             </Link>
 
-            {/* 🗂 Kredit App: [count] */}
-            <Link
-              href="/billing"
-              title="Kredit Slot Aplikasi"
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-amber-300 text-[11px] font-semibold transition-colors"
-            >
-              <span>🗂</span>
-              <span className="hidden sm:inline">Kredit App:</span>
-              <span>{user?.app_credits ?? 0}</span>
-            </Link>
-
-            {/* ❔ Kredit AI: [count] */}
-            <Link
-              href="/billing"
-              title="Kredit Token AI"
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-violet-300 text-[11px] font-semibold transition-colors"
-            >
-              <span>❔</span>
-              <span className="hidden sm:inline">Kredit AI:</span>
-              <span>{user?.ai_credits ? Math.round(user.ai_credits / 1000) : 0}k</span>
-            </Link>
-
-            {/* Status Pill: ● Idle / ● Bekerja... */}
+            {/* Status */}
             <div className="hidden sm:flex items-center">
               {isBuilding ? (
-                <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-amber-500/15 text-amber-300 border border-amber-500/30 shadow-sm shadow-amber-500/10">
+                <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-amber-500/15 text-amber-300 border border-amber-500/30">
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
                   <span>Bekerja...</span>
                 </span>
@@ -518,29 +527,30 @@ export default function DashboardLayout({
               )}
             </div>
 
-            {/* ⚙ Pengaturan (Dipindahkan ke samping keluar) */}
-            <Link
-              href="/account"
-              title="Pengaturan Akun & Mutasi"
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs transition-colors ${
-                pathname === '/account'
-                  ? 'bg-violet-600/20 text-violet-300 border-violet-500/30'
-                  : 'bg-slate-900/60 hover:bg-slate-800 border-slate-800 text-slate-300'
-              }`}
-            >
-              <Settings className="w-3.5 h-3.5 text-slate-400" />
-              <span className="hidden sm:inline">Pengaturan</span>
-            </Link>
+            {/* Group 4: Account Actions with Divider */}
+            <div className="flex items-center gap-1.5 pl-2.5 border-l border-slate-800">
+              <Link
+                href="/account"
+                title="Pengaturan Akun & Mutasi"
+                className={`p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border text-[11px] transition-colors flex items-center gap-1.5 ${
+                  pathname === '/account'
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                    : 'bg-slate-900/70 hover:bg-slate-800 border-slate-800 text-slate-300'
+                }`}
+              >
+                <Settings className="w-3.5 h-3.5 text-slate-400" />
+                <span className="hidden md:inline">Pengaturan</span>
+              </Link>
 
-            {/* ↪ Keluar */}
-            <button
-              onClick={handleLogout}
-              title="Keluar dari akun"
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900/60 hover:bg-rose-500/10 hover:text-rose-300 border border-slate-800 text-slate-400 text-xs transition-colors"
-            >
-              <span>↪</span>
-              <span className="hidden sm:inline">Keluar</span>
-            </button>
+              <button
+                onClick={handleLogout}
+                title="Keluar dari akun"
+                className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-slate-900/70 hover:bg-rose-500/10 hover:text-rose-300 border border-slate-800 text-slate-400 text-[11px] transition-colors flex items-center gap-1"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">Keluar</span>
+              </button>
+            </div>
           </div>
         </header>
 
