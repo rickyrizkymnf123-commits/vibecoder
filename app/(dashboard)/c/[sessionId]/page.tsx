@@ -226,6 +226,11 @@ export default function ChatSessionPage() {
           } else if (eventType === 'complete') {
             if (eventData.app) {
               setDeployedApp(eventData.app);
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(
+                  new CustomEvent('forge:app-published', { detail: { app: eventData.app } })
+                );
+              }
             }
             setMessages((prev) => [
               ...prev,

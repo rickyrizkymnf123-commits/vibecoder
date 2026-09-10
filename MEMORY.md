@@ -291,3 +291,7 @@
 - **Timeout**: Set minimal 120s pada ReAct loop untuk mencegah premature abort saat model menulis kode besar.
 - **Payload Compression**: Gunakan `getOptimizedMessages` untuk meringkas argumen `content` pada tool call `write_file` lama di riwayat multi-turn. Ini mencegah eksploitasi konteks token dan mempercepat respons inferensi.
 - **Auto-Retry**: Selalu sertakan 3x auto-retry pada fetch call AI provider.
+
+### Lovable/Emergent Architecture Contract
+- Seluruh aplikasi web yang dihasilkan AI wajib memuat: Landing page komersial, Modal/page Login & Register dengan switch role (User vs Admin), User Dashboard mandiri, Admin Dashboard dengan master data CRUD & grafik statistik (Chart.js), dan skema relasional di data/*.json.
+- Tombol header domain di top bar harus selalu merujuk ke /preview/[slug] aktif.

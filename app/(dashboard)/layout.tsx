@@ -49,14 +49,38 @@ export default function DashboardLayout({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isConfirmingDeleteAll, setIsConfirmingDeleteAll] = useState(false);
   const [isBuilding, setIsBuilding] = useState(false);
+  const [latestApp, setLatestApp] = useState<{ id?: string; name: string; slug: string } | null>(null);
   const pathname = usePathname();
   const router = useRouter();
+
+  const fetchLatestApp = async () => {
+    try {
+      const res = await fetch('/api/apps');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.apps && data.apps.length > 0) {
+          setLatestApp(data.apps[0]);
+        }
+      }
+    } catch {}
+  };
 
   useEffect(() => {
     fetchUserData();
     fetchSessions();
+    fetchLatestApp();
     setMobileMenuOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    const handleAppPublished = (e: any) => {
+      if (e.detail?.app) {
+        setLatestApp(e.detail.app);
+      }
+    };
+    window.addEventListener('forge:app-published', handleAppPublished);
+    return () => window.removeEventListener('forge:app-published', handleAppPublished);
+  }, []);
 
   useEffect(() => {
     const handleStatus = (e: any) => {
@@ -414,15 +438,21 @@ export default function DashboardLayout({
 
           {/* Right: Horizontal Menu */}
           <div className="flex items-center gap-1.5 sm:gap-2 text-xs font-medium shrink-0">
-            {/* ↗ [subdomain].forge.dev */}
+            {/* ↗ [subdomain].forge.dev / Live Preview Button */}
             <a
-              href={`https://${user?.subdomain || 'demo'}.forge.dev`}
+              href={latestApp ? `/preview/${latestApp.slug}` : `/preview/gudangku-inventori-stok`}
               target="_blank"
               rel="noreferrer"
-              title="Kunjungi subdomain Forge Anda"
-              className="hidden lg:flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-[11px] font-mono text-slate-300 hover:text-white transition-colors"
+              title={latestApp ? `Buka Live Preview: ${latestApp.name}` : 'Buka Live Preview Aplikasi'}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-violet-950/40 hover:bg-violet-900/60 border border-violet-700/50 hover:border-violet-500 text-[11px] font-mono text-violet-200 hover:text-white transition-all shadow-sm group"
             >
-              <span>↗ {user?.subdomain || 'demo'}.forge.dev</span>
+              <span className="text-violet-400 group-hover:text-violet-300 font-bold">↗</span>
+              <span className="font-semibold text-white">
+                {latestApp ? `${latestApp.slug}.forge.dev` : `${user?.subdomain || 'demo'}.forge.dev`}
+              </span>
+              <span className="hidden sm:inline text-[9px] px-1.5 py-0.5 rounded bg-violet-600/30 text-violet-300 border border-violet-500/30 font-sans uppercase font-bold tracking-wider">
+                Live App
+              </span>
             </a>
 
             {/* 🌐 Domain */}

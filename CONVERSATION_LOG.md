@@ -669,3 +669,11 @@ Pengguna mengirim tangkapan layar antarmuka yang menunjukkan pembuatan aplikasi 
 
 ### Hasil Verifikasi:
 - Uji simulasi 20 tool call beruntun berjalan sukses 100% tanpa error timeout, menghasilkan 7 berkas aplikasi fisik utuh dan terbit di disk/database.
+
+- **Jadwal Shutdown**: Perintah shutdown PC Windows dalam 10 menit (600 detik) telah diaktifkan via shutdown.exe /s /t 600 dan timer reminder diset.
+
+- **Menjalankan Server Dev**: Server Next.js telah dihidupkan kembali di port 3006 (http://localhost:3006) dan terverifikasi berstatus HTTP 200 OK.
+
+- **Proses /learn & Proposal Mutu Aplikasi**: Menyusun proposal standar arsitektur Lovable/Emergent (Landing page, Multi-role User/Admin dashboard, Auth, Database) dan navigasi preview header di learning_proposal.md tanpa mengubah kode sebelum disetujui.
+
+- **Peningkatan Standar Mutu Lovable/Emergent & Preview Header**: Mengimplementasikan 5 pilar arsitektur aplikasi produksi (Landing Page, Multi-role User/Admin, Auth, Database relasional) di SYSTEM_PROMPT lib/agent/loop.ts, serta menjadikan tombol header ↗ [slug].forge.dev dinamis dan dapat langsung diklik membuka Live Interactive Preview di /preview/[slug].
