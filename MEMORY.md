@@ -279,3 +279,10 @@
 ## Vercel & Domain Cleanup
 - 4 Proyek uji coba di Vercel (`forge-kasir-stok-kelontong`, `vibecoder-sembako-kasir-pintar`, `vibecoder-sewa-mobil-cepat`, `vibecoder-armada-rental`) telah dihapus secara permanen via Vercel REST API.
 - Tabel `apps` di Supabase telah dibersihkan sehingga halaman `/domains` bersih kembali tanpa entri kustom lama.
+
+## Pure ReAct Engine (Zero-Fake)
+- Seluruh template hardcoded, detectDomainConfig, dan mock test telah dihapus total.
+- Engine beroperasi murni 100% multi-turn ReAct via KoboiLLM / OpenAI / Gemini.
+- Tool fisik: write_file, read_file, edit_file, bash (Git Bash di Windows), run_tests, publish_app, todo_write.
+- AI memiliki kapabilitas self-repair (membaca stderr terminal dan memperbaiki kodenya sendiri).
+- Live Preview merender HTML/JS buatan AI via iframe sandbox di /api/preview/[slug]/raw dan menyediakan Code Explorer di /preview/[slug].

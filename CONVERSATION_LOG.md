@@ -613,3 +613,31 @@
 - **Hasil**:
   - Halaman `/domains` kini bersih tanpa sisa entri lama.
   - Dashboard Vercel bersih dari 4 proyek percobaan.
+
+## 27. Sesi 23: Penyusunan Rencana Arsitektur ReAct Murni (Zero Fake)
+- **Konteks & Keluhan Pengguna**:
+  - Pengguna menegur keras proses pembuatan aplikasi sebelumnya yang instan (<10 detik), mengabaikan tema prompt (minta inventori malah jadi kasir/keuangan), dan menggunakan template fallback statis.
+  - Pengguna membagikan transkrip lengkap VibeCoder asli (proses ~1 jam, bash terminal cek runtime PHP/Node, 8 todo, write_file bertahap ratusan baris, node --check, 16 skenario e2e test dengan kegagalan yang didebug sendiri menggunakan edit_file, Playwright visual check).
+- **Hasil Analisis & Rencana**:
+  - Dibuat rencana arsitektur di `implementation_plan.md`:
+    1. Pemusnahan total `detectDomainConfig` dan seluruh string template hardcode di `lib/agent/loop.ts`.
+    2. Penghapusan mock test palsu di `lib/agent/executor.ts`.
+    3. Rekonstruksi ReAct Engine murni multi-turn dengan tool calling fisik (`bash`, `write_file`, `edit_file`, `read_file`, `todo_write`, `publish_app`).
+    4. Perombakan Live Preview agar merender HTML/JS nyata hasil karya AI dari workspace + Code Explorer.
+    5. Pembersihan folder `workspaces/*` lama.
+
+## 28. Sesi 24: Implementasi Penuh Pure ReAct Engine (Zero-Fake) & Live Sandbox Preview
+- **Aksi yang Dijalankan**:
+  1. Menghapus total fungsi `detectDomainConfig` dan seluruh blok fallback template hardcoded (~400 baris) di `lib/agent/loop.ts`.
+  2. Menghapus 16 skenario mock test di `lib/agent/executor.ts` dan menggantinya dengan verifikasi sintaks fisik (`node --check`) dan skrip uji nyata di disk.
+  3. Mengonfigurasi `executeBash` agar mendukung Git Bash (`C:\Program Files\Git\bin\bash.exe`) di lingkungan Windows untuk eksekusi skrip Linux-style backgrounding secara sempurna.
+  4. Menambahkan tool `edit_file` ke skema OpenAI dan Gemini tools agar AI memiliki kapabilitas self-repair nyata.
+  5. Membangun endpoint baru `/api/preview/[slug]/raw` untuk menyajikan antarmuka HTML/CSS/JS nyata buatan AI ke dalam sandbox iframe.
+  6. Memperbarui `/preview/[slug]` dengan fitur Device Toggle (Desktop, Tablet, Mobile) dan tab Berkas & Kode (Code Explorer).
+  7. Membersihkan 31 direktori workspace template lama di `workspaces/*`.
+- **Hasil Pengujian Nyata**:
+  - Prompt: *"Buatkan saya aplikasi inventori stok barang gudang sederhana. Ada pencatatan barang masuk dan keluar, status stok minimum, dan tabel data barang."*
+  - Menggunakan model `gemini-3.7-flash` via KoboiLLM.
+  - AI menyusun 7 todo list, menulis `package.json`, dataset realistis `data/inventory.json` (Monitor LED, Keyboard Mekanikal, Kertas HVS, Bor Tangan, dll.), `server.js`, `public/index.html` (Tailwind CSS, Lucide icons, Dark mode), dan `test.js`.
+  - AI melakukan self-repair di terminal saat mendeteksi bentrok port, mengubah ke port 4005, menjalankan tes hingga 100% lulus, lalu mempublikasikan aplikasi dengan nama **GudangKu - Sistem Inventori & Stok Barang**.
+  - Aplikasi dapat dibuka secara interaktif di `http://localhost:3006/preview/gudangku-inventori-stok`.

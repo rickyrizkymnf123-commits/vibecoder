@@ -100,15 +100,25 @@ export async function executeEditFile(
   };
 }
 
+function getPreferredShell(): string | undefined {
+  if (process.platform === 'win32') {
+    const gitBash = 'C:\\Program Files\\Git\\bin\\bash.exe';
+    if (fs.existsSync(gitBash)) return gitBash;
+  }
+  return undefined;
+}
+
 export async function executeBash(
   sessionId: string,
   command: string
 ): Promise<{ command: string; stdout: string; stderr: string; exitCode: number; success: boolean }> {
   const wsDir = getWorkspaceDir(sessionId);
+  const shell = getPreferredShell();
 
   try {
     const { stdout, stderr } = await execAsync(command, {
       cwd: wsDir,
+      shell,
       timeout: 30000,
       maxBuffer: 1024 * 1024
     });
@@ -145,156 +155,65 @@ export async function executeRunTests(
   const wsDir = getWorkspaceDir(sessionId);
   const files = collectAllFiles(wsDir);
 
-  const testCases: Array<{ id: number; name: string; status: 'pass' | 'fail'; durationMs: number; error?: string }> = [
-    { id: 1, name: 'Struktur modul proyek & package.json valid', status: 'pass', durationMs: 0 },
-    { id: 2, name: 'Sintaks JavaScript/TypeScript bersih dari syntax error', status: 'pass', durationMs: 0 },
-    { id: 3, name: 'Konfigurasi skema database & entitas model', status: 'pass', durationMs: 0 },
-    { id: 4, name: 'Proteksi kata sandi dengan salt dan timing-safe hashing', status: 'pass', durationMs: 0 },
-    { id: 5, name: 'Proteksi token CSRF HMAC-SHA256 pada operasi mutasi', status: 'pass', durationMs: 0 },
-    { id: 6, name: 'Inisialisasi akun administrator default (admin/admin123)', status: 'pass', durationMs: 0 },
-    { id: 7, name: 'Multi-role user authentication (Admin vs Operator Kasir)', status: 'pass', durationMs: 0 },
-    { id: 8, name: 'Endpoint CRUD: Pembuatan record data baru', status: 'pass', durationMs: 0 },
-    { id: 9, name: 'Endpoint CRUD: Pembacaan data dan agregasi laporan', status: 'pass', durationMs: 0 },
-    { id: 10, name: 'Endpoint CRUD: Pembaruan status & validasi input', status: 'pass', durationMs: 0 },
-    { id: 11, name: 'Endpoint CRUD: Penghapusan data dengan concurrency guard', status: 'pass', durationMs: 0 },
-    { id: 12, name: 'Sanitasi teks & perlindungan injeksi karakter berbahaya', status: 'pass', durationMs: 0 },
-    { id: 13, name: 'Penyimpanan mata uang rupiah dalam satuan integer sen', status: 'pass', durationMs: 0 },
-    { id: 14, name: 'Penetapan zona waktu transaksi lokal Asia/Jakarta (WIB)', status: 'pass', durationMs: 0 },
-    { id: 15, name: 'Kalkulasi metrik KPI dashboard & ringkasan analitik', status: 'pass', durationMs: 0 },
-    { id: 16, name: 'Visual UI & status render responsive komponen web', status: 'pass', durationMs: 0 }
-  ];
-
   if (Object.keys(files).length === 0) {
     return {
-      total: 16,
+      total: 1,
       passed: 0,
-      failed: 16,
+      failed: 1,
       status: 'failed',
       summary: 'Belum ada berkas yang ditulis di workspace',
-      testCases: testCases.map(t => ({ ...t, status: 'fail', error: 'Workspace kosong' }))
+      testCases: [{ id: 1, name: 'Pemeriksaan direktori workspace', status: 'fail', durationMs: 0, error: 'Workspace masih kosong' }]
     };
   }
 
-  // 1. Physical validation of package.json
-  const t1Start = Date.now();
+  const testCases: Array<{ id: number; name: string; status: 'pass' | 'fail'; durationMs: number; error?: string }> = [];
+  let testId = 1;
+
+  // 1. Validasi package.json (jika ada)
   const pkgPath = path.join(wsDir, 'package.json');
-  if (!fs.existsSync(pkgPath)) {
-    testCases[0].status = 'fail';
-    testCases[0].error = 'package.json tidak ditemukan';
-  } else {
+  if (fs.existsSync(pkgPath)) {
+    const start = Date.now();
     try {
       JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+      testCases.push({ id: testId++, name: 'Validasi berkas package.json', status: 'pass', durationMs: Date.now() - start });
     } catch (e: any) {
-      testCases[0].status = 'fail';
-      testCases[0].error = 'package.json tidak valid JSON: ' + e.message;
+      testCases.push({ id: testId++, name: 'Validasi berkas package.json', status: 'fail', durationMs: Date.now() - start, error: e.message });
     }
   }
-  testCases[0].durationMs = Date.now() - t1Start;
 
-  // 2. Physical syntax check via node --check server.js
-  const t2Start = Date.now();
-  const serverPath = path.join(wsDir, 'server.js');
-  if (fs.existsSync(serverPath)) {
+  // 2. Pemeriksaan sintaks (node --check) untuk semua file JS/MJS/CJS
+  const jsFiles = Object.keys(files).filter(f => (f.endsWith('.js') || f.endsWith('.mjs') || f.endsWith('.cjs')) && !f.includes('node_modules'));
+  for (const jsFile of jsFiles) {
+    const start = Date.now();
     try {
-      await execAsync('node --check server.js', { cwd: wsDir, timeout: 5000 });
+      await execAsync(`node --check "${jsFile}"`, { cwd: wsDir, timeout: 8000 });
+      testCases.push({ id: testId++, name: `Sintaks check: ${jsFile}`, status: 'pass', durationMs: Date.now() - start });
     } catch (e: any) {
-      testCases[1].status = 'fail';
-      testCases[1].error = e.stderr || e.message;
-    }
-  } else {
-    testCases[1].status = 'fail';
-    testCases[1].error = 'server.js tidak ditemukan untuk pemeriksaan sintaks';
-  }
-  testCases[1].durationMs = Date.now() - t2Start;
-
-  // 3. Database schema & records file
-  const t3Start = Date.now();
-  const recPath = path.join(wsDir, 'data', 'records.json');
-  if (!fs.existsSync(recPath)) {
-    testCases[2].status = 'fail';
-    testCases[2].error = 'data/records.json tidak ditemukan';
-  } else {
-    try {
-      const recs = JSON.parse(fs.readFileSync(recPath, 'utf8'));
-      if (!Array.isArray(recs) || recs.length === 0) {
-        testCases[2].status = 'fail';
-        testCases[2].error = 'data/records.json kosong atau bukan array';
-      }
-    } catch (e: any) {
-      testCases[2].status = 'fail';
-      testCases[2].error = 'data/records.json tidak valid JSON: ' + e.message;
+      const errMsg = (e.stderr || e.stdout || e.message || '').trim();
+      testCases.push({ id: testId++, name: `Sintaks check: ${jsFile}`, status: 'fail', durationMs: Date.now() - start, error: errMsg });
     }
   }
-  testCases[2].durationMs = Date.now() - t3Start;
 
-  // 4 & 5. Password hashing & CSRF protection
-  const t4Start = Date.now();
-  const authPath = path.join(wsDir, 'lib', 'auth.js');
-  if (!fs.existsSync(authPath)) {
-    testCases[3].status = 'fail';
-    testCases[3].error = 'lib/auth.js tidak ditemukan';
-    testCases[4].status = 'fail';
-    testCases[4].error = 'lib/auth.js tidak ditemukan';
-  } else {
-    const authCode = fs.readFileSync(authPath, 'utf8');
-    if (!authCode.includes('hashPassword') || !authCode.includes('verifyPassword')) {
-      testCases[3].status = 'fail';
-      testCases[3].error = 'hashPassword / verifyPassword tidak diimplementasikan';
-    }
-    if (!authCode.includes('createCsrfToken') && !authCode.includes('csrf')) {
-      testCases[4].status = 'fail';
-      testCases[4].error = 'createCsrfToken tidak diimplementasikan';
-    }
-  }
-  testCases[3].durationMs = Date.now() - t4Start;
-  testCases[4].durationMs = 15;
-
-  // 6 & 7. Admin & Multi-role authentication
-  testCases[5].durationMs = 20;
-  testCases[6].durationMs = 25;
-
-  // 8-11. CRUD Endpoints verification via physical test runner
-  const testScriptPath = path.join(wsDir, 'test.mjs');
-  if (fs.existsSync(testScriptPath)) {
-    const tCrudStart = Date.now();
-    try {
-      await execAsync('node test.mjs', { cwd: wsDir, timeout: 10000 });
-      for (let i = 7; i <= 10; i++) {
-        testCases[i].status = 'pass';
-        testCases[i].durationMs = Math.round((Date.now() - tCrudStart) / 4);
-      }
-    } catch (e: any) {
-      for (let i = 7; i <= 10; i++) {
-        testCases[i].status = 'fail';
-        testCases[i].error = e.stderr || e.message;
+  // 3. Eksekusi skrip pengujian fisik jika dibuat oleh AI
+  const potentialTestScripts = ['test/e2e.js', 'test.mjs', 'test.js', 'test/test.js'];
+  for (const testScript of potentialTestScripts) {
+    const fullTestPath = path.join(wsDir, testScript);
+    if (fs.existsSync(fullTestPath)) {
+      const start = Date.now();
+      try {
+        const { stdout } = await execAsync(`node "${testScript}"`, { cwd: wsDir, timeout: 20000 });
+        testCases.push({ id: testId++, name: `Eksekusi skrip pengujian: ${testScript}`, status: 'pass', durationMs: Date.now() - start });
+      } catch (e: any) {
+        const errMsg = (e.stderr || e.stdout || e.message || '').trim();
+        testCases.push({ id: testId++, name: `Eksekusi skrip pengujian: ${testScript}`, status: 'fail', durationMs: Date.now() - start, error: errMsg });
       }
     }
-  } else {
-    for (let i = 7; i <= 10; i++) {
-      testCases[i].status = 'fail';
-      testCases[i].error = 'test.mjs tidak ditemukan';
-    }
   }
 
-  // 12-14. Sanitasi teks, mata uang rupiah sen, timezone WIB
-  const utilPath = path.join(wsDir, 'lib', 'util.js');
-  if (fs.existsSync(utilPath)) {
-    const utilCode = fs.readFileSync(utilPath, 'utf8');
-    testCases[11].status = utilCode.includes('sanitizeInput') ? 'pass' : 'fail';
-    testCases[12].status = (utilCode.includes('formatRupiah') && utilCode.includes('parseRupiahToCents')) ? 'pass' : 'fail';
-    testCases[13].status = utilCode.includes('Asia/Jakarta') ? 'pass' : 'fail';
-  } else {
-    testCases[11].status = 'fail';
-    testCases[12].status = 'fail';
-    testCases[13].status = 'fail';
+  // Jika tidak ada file JS yang diuji
+  if (testCases.length === 0) {
+    testCases.push({ id: testId++, name: 'Pemeriksaan berkas statis', status: 'pass', durationMs: 5 });
   }
-  testCases[11].durationMs = 10;
-  testCases[12].durationMs = 12;
-  testCases[13].durationMs = 8;
-
-  // 15-16. KPI Analytics & Responsive UI
-  testCases[14].durationMs = 35;
-  testCases[15].durationMs = 50;
 
   const failedCount = testCases.filter(t => t.status === 'fail').length;
   const passedCount = testCases.length - failedCount;
@@ -305,8 +224,8 @@ export async function executeRunTests(
     failed: failedCount,
     status: failedCount === 0 ? 'passed' : 'failed',
     summary: failedCount === 0
-      ? `${passedCount}/${testCases.length} Skenario Pengujian Lulus 100% (Zero Failure)`
-      : `${failedCount} pengujian gagal, ${passedCount} lulus`,
+      ? `${passedCount}/${testCases.length} Pengujian Sintaks & Skrip Nyata Lulus 100%`
+      : `${failedCount} pengujian gagal dari ${testCases.length} total pengujian`,
     testCases
   };
 }

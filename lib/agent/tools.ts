@@ -42,6 +42,28 @@ export const AGENT_TOOLS: GeminiFunctionDeclaration[] = [
     }
   },
   {
+    name: 'edit_file',
+    description: 'Memperbaiki atau mengganti potongan teks/kode tertentu pada berkas yang sudah ada di workspace.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        path: {
+          type: 'STRING',
+          description: 'Path relatif berkas yang ingin diedit, misal server.js atau lib/views.js'
+        },
+        target_content: {
+          type: 'STRING',
+          description: 'Potongan teks atau kode lama yang persis akan diganti'
+        },
+        replacement_content: {
+          type: 'STRING',
+          description: 'Potongan teks atau kode baru pengganti'
+        }
+      },
+      required: ['path', 'target_content', 'replacement_content']
+    }
+  },
+  {
     name: 'bash',
     description: 'Mengeksekusi perintah terminal shell di dalam folder workspace proyek (misal: node --check server.js atau node test.mjs). Mengembalikan stdout, stderr, dan exit code.',
     parameters: {
@@ -194,6 +216,31 @@ export function getOpenAiTools() {
             }
           },
           required: ['path']
+        }
+      }
+    },
+    {
+      type: 'function' as const,
+      function: {
+        name: 'edit_file',
+        description: 'Mengedit atau memperbaiki sebagian teks/kode di berkas yang sudah ada',
+        parameters: {
+          type: 'object',
+          properties: {
+            path: {
+              type: 'string',
+              description: 'Path relatif berkas'
+            },
+            target_content: {
+              type: 'string',
+              description: 'Teks/kode lama yang ingin diganti'
+            },
+            replacement_content: {
+              type: 'string',
+              description: 'Teks/kode baru pengganti'
+            }
+          },
+          required: ['path', 'target_content', 'replacement_content']
         }
       }
     },

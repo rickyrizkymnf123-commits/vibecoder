@@ -145,7 +145,7 @@ export async function GET(
       published_at: app.published_at,
       records,
       users,
-      files: Object.keys(app.files || {})
+      files: app.files || {}
     }
   });
 }

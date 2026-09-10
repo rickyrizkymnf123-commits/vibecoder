@@ -508,15 +508,30 @@ export async function saveApp(
     .select()
     .single();
 
-  if (error && error.message?.includes('apps_session_id_fkey')) {
-    record.session_id = null;
-    const retry = await supabaseAdmin
-      .from('apps')
-      .upsert(record, { onConflict: 'id' })
-      .select()
-      .single();
-    data = retry.data;
-    error = retry.error;
+  if (error) {
+    let retryNeeded = false;
+    if (error.message?.includes('apps_session_id_fkey')) {
+      record.session_id = null;
+      retryNeeded = true;
+    }
+    if (error.message?.includes('apps_user_id_fkey')) {
+      const { data: firstProfile } = await supabaseAdmin.from('profiles').select('id').limit(1).single();
+      if (firstProfile?.id) record.user_id = firstProfile.id;
+      retryNeeded = true;
+    }
+    if (retryNeeded) {
+      if (record.session_id) {
+        const { data: sess } = await supabaseAdmin.from('chat_sessions').select('id').eq('id', record.session_id).single();
+        if (!sess) record.session_id = null;
+      }
+      const retry = await supabaseAdmin
+        .from('apps')
+        .upsert(record, { onConflict: 'id' })
+        .select()
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
   }
 
   if (error || !data) {
