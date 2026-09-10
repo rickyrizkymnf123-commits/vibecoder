@@ -584,3 +584,16 @@
      - `npx tsc --noEmit` lulus 0 error.
      - Pengujian Custom AI (`test_custom_ai_generation.mjs`): Terverifikasi `Did fallback template execute? false`, sistem mengembalikan error asli secara jujur.
      - Pengujian Gemini (`test_live_ai_generation.mjs`): Terverifikasi mode pelaporan transparan (`(Mode: live-ai)` saat Gemini sukses di turn 1-6 dan `(Mode: fallback-template)` saat kuota 429 habis).
+
+## 25. Sesi 21: Push Pembaruan ke GitHub Publik
+- **Status Push**: Berhasil di-push ke branch `main`.
+- **Commit**: `3d3f57b` (`feat: transparent AI generation mode, Gemini 3.5 failover priority, and rate-limit resilience`).
+- **Berkas Termigrasi**:
+  - `.gitignore`: Mengabaikan varian `data/ai_config.json*`.
+  - `lib/agent/loop.ts`: Urutan prioritas `gemini-3.5-flash`, timeout 35 detik, 429 auto-retry & pacing, eliminasi fallback saat AI kustom aktif.
+  - `lib/supabase/db.ts`: Penanganan toleran foreign key `apps_session_id_fkey`.
+  - `app/api/chat/stream/route.ts`: Penyematan penanda `generationMode` ke database chat message & event `done`.
+  - `app/(dashboard)/c/[sessionId]/page.tsx`: Indikator UI live stream & riwayat chat (`Mode Live AI` vs `Mode Cadangan (Fallback Template)`).
+  - `CONVERSATION_LOG.md` & `MEMORY.md`.
+- **Tautan Repositori**: **[https://github.com/rickyrizkymnf123-commits/vibecoder](https://github.com/rickyrizkymnf123-commits/vibecoder)**
+
