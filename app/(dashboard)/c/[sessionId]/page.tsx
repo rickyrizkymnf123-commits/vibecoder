@@ -647,6 +647,31 @@ export default function ChatSessionPage() {
                       <FormattedMessage content={m.content} />
                     </div>
 
+                    {/* Render historical todo checklist with strikethrough (Ala VibeCoder) */}
+                    {m.todo_list && m.todo_list.length > 0 && (
+                      <div className="space-y-2.5 pt-3 border-t border-slate-800/80">
+                        <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                          <span>Daftar Tugas & Checklist ({m.todo_list.filter((t) => t.completed).length}/{m.todo_list.length} Selesai)</span>
+                          <span className="text-emerald-400 font-mono text-[11px]">100% Selesai</span>
+                        </div>
+                        <div className="space-y-2 bg-slate-950/70 p-4 rounded-xl border border-slate-800/90 font-sans">
+                          {m.todo_list.map((todo) => (
+                            <div
+                              key={todo.id}
+                              className={`flex items-start gap-3 text-xs sm:text-[13px] leading-relaxed transition-all ${
+                                todo.completed
+                                  ? 'text-slate-400 line-through decoration-slate-500/80'
+                                  : 'text-slate-200'
+                              }`}
+                            >
+                              <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" strokeWidth={2.5} />
+                              <span className="select-text">{todo.title}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Render historical tool calls if any */}
                     {m.tool_calls && m.tool_calls.length > 0 && (
                       <div className="space-y-2 pt-3 border-t border-slate-800/80">
@@ -760,20 +785,20 @@ export default function ChatSessionPage() {
                   {liveTodos.map((todo) => (
                     <div
                       key={todo.id}
-                      className={`flex items-center gap-2.5 text-xs transition-all ${
+                      className={`flex items-start gap-3 text-xs sm:text-[13px] leading-relaxed transition-all ${
                         todo.completed
-                          ? 'text-emerald-400 line-through opacity-80'
+                          ? 'text-slate-400 line-through decoration-slate-500/80'
                           : todo.active
-                          ? 'text-white font-semibold'
+                          ? 'text-white font-medium'
                           : 'text-slate-500'
                       }`}
                     >
                       {todo.completed ? (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" strokeWidth={2.5} />
                       ) : todo.active ? (
-                        <Loader2 className="w-4 h-4 text-violet-400 animate-spin shrink-0" />
+                        <Loader2 className="w-4 h-4 text-violet-400 animate-spin shrink-0 mt-0.5" />
                       ) : (
-                        <Circle className="w-4 h-4 text-slate-600 shrink-0" />
+                        <Circle className="w-4 h-4 text-slate-600 shrink-0 mt-0.5" />
                       )}
                       <span>{todo.title}</span>
                     </div>
