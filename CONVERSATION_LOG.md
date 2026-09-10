@@ -756,4 +756,27 @@ Pengguna mengirim tangkapan layar antarmuka yang menunjukkan pembuatan aplikasi 
      - Step 6: Modal Register (Form pendaftaran akun baru dengan pilihan peran Staf vs Admin).
      - Seluruh 6 langkah pengujian terbukti lulus 100% dengan tangkapan layar fisik di direktori workspace.
 
+## 34. Sesi 30: Isolasi Bersih Navbar Header (Eliminasi Tautan LP saat Login Admin/Staf)
+- **Masalah & Masukan Pengguna**:
+  - Pengguna mengirim tangkapan layar yang menunjukkan bahwa saat masuk sebagai Admin atau User (Staf), tautan navigasi Landing Page publik (*Solusi Bisnis, 6 Modul Inti, Cara Kerja, Paket & Harga, FAQ*) masih terbawa dan menempel di header berdampingan dengan tab dashboard internal.
+- **Investigasi & Akar Masalah**:
+  - Di berkas `public/index.html`, kontainer tautan menggunakan kelas Tailwind `hidden lg:flex`. Pada viewport layar desktop (>= 1024px), aturan media query `@media (min-width: 1024px) { .lg\:flex { display: flex; } }` meng-override penambahan kelas `.hidden` secara dinamis oleh JavaScript.
+  - State navbar pada fungsi `updateNavbarState()` belum secara tegas mengunci `style.display = 'none'` untuk elemen `#public-nav-links` saat user sedang dalam status terotentikasi.
+- **Solusi & Implementasi**:
+  1. *Perbaikan Header `index.html` & `app.js`*:
+     - Menghapus kelas bentrok `lg:flex` pada `#public-nav-links` dan mengontrol properti `display` secara tegas (`'flex'` untuk Guest di Landing Page pada desktop, dan `'none'` secara mutlak ketika sudah Login).
+     - Menambahkan handler `handleLogoClick()` agar klik logo tidak melempar pengguna terotentikasi kembali ke landing page promosi, melainkan mempertahankan mereka di portal/dashboard aktif masing-masing role.
+     - Menambahkan badge status `Portal Lapangan Aktif` pada header saat staf lapangan login, menjaga simetri dan kerapian navbar.
+  2. *Sinkronisasi Disk & Database*:
+     - Memperbarui berkas di kedua folder workspace (`test-inv-1789023963513` dan `test-inv-1789024790373`).
+     - Menyinkronkan pembaruan berkas ke tabel `apps` di Supabase Postgres Singapore.
+  3. *Peningkatan Standardisasi Generator AI (`lib/agent/loop.ts`)*:
+     - Menambahkan aturan isolasi navbar header mutlak ke dalam `SYSTEM_PROMPT` agar setiap aplikasi multi-role yang dibuat AI di masa mendatang otomatis memisahkan navigasi publik dan navigasi internal dashboard secara sempurna.
+  4. *Verifikasi Otomatis Headless Google Chrome (`test_header_fix.js`)*:
+     - Status Tamu/Guest: Tautan LP tampil (`display: flex`), tab internal tersembunyi.
+     - Status Admin: Tautan LP hilang 100% (`display: none`), tab admin tampil (`Master Data`, `Kelola Pengguna`, `Log Mutasi`).
+     - Status Staf: Tautan LP hilang 100% (`display: none`), tab admin tersembunyi, badge staf tampil.
+     - Seluruh pengujian lulus 100% terkonfirmasi visual via screenshot fisik.
+
+
 

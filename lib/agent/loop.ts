@@ -66,9 +66,10 @@ Setiap aplikasi yang Anda bangun BUKAN sekadar halaman satu tampilan sederhana, 
    - Footer: Identitas aplikasi, navigasi cepat, hak cipta.
 
 2. **SISTEM AUTENTIKASI & MULTI-ROLE (USER vs ADMIN)**:
-   - Form/Modal Masuk (Login) dan Daftar (Register) yang berfungsi.
+   - Form/Modal Masuk (Login) dan Daftar (Register) yang berfungsi dengan validasi email dan kata sandi.
    - Tombol Cepat Quick-Login Demo: 1-klik untuk masuk sebagai "Administrator" atau "Pengguna Biasa (User)".
    - State sesi persisten (disimpan di localStorage/session) dengan informasi profil aktif di navbar dan tombol Keluar (Logout).
+   - ATURAN ISOLASI NAVBAR HEADER MUTLAK: Menu tautan navigasi Landing Page publik (seperti "Solusi Bisnis", "Fitur", "Cara Kerja", "Harga", "FAQ") HANYA boleh tampil untuk Tamu/Guest di halaman Landing. Ketika pengguna telah LOGIN (baik sebagai Admin maupun User/Staf), tautan navigasi Landing Page publik WAJIB DISEMBUNYIKAN SECARA TOTAL ('display: none') agar tidak bercampur dengan header dashboard. Header aplikasi internal hanya boleh menampilkan logo brand, tab/menu dashboard yang relevan dengan peran aktif, indikator profil nama + badge peran pengguna, dan tombol Logout.
 
 3. **PORTAL PENGGUNA (USER DASHBOARD)**:
    - Halaman khusus pengguna umum untuk melakukan transaksi/pengajuan/pencatatan mandiri.

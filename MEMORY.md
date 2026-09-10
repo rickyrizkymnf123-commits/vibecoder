@@ -317,8 +317,11 @@
   - Tamu (Guest): Hanya melihat landing page dan tombol Masuk / Daftar.
   - Administrator: Masuk ke Pusat Kontrol (KPI, visualisasi Chart.js, Master Data CRUD, dan Tab Kelola Pengguna / User Management).
   - User / Staf Lapangan: Masuk ke Portal Operasional Staf tanpa hak akses atau tombol menu administratif.
+- **Isolasi Mutlak Navbar Header**:
+  - Tautan marketing Landing Page (Solusi Bisnis, 6 Modul, Cara Kerja, dsb.) WAJIB disembunyikan total ('display: none') saat pengguna sudah login (baik Admin maupun User/Staf). Header aplikasi internal hanya menampilkan logo, tab/menu dashboard peran aktif, profil pengguna, dan tombol Logout.
 - **Restorasi Riwayat Chat & Sesi**:
   - Riwayat sesi ditautkan ke `user_id: user-demo-1` di tabel `chat_sessions` dan `chat_messages` Supabase agar otomatis tampil di sidebar pengguna yang sedang aktif di browser.
+
 
 
 
