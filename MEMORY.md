@@ -310,4 +310,15 @@
 - Saat pengguna meminta revisi di sesi obrolan (misal: ganti warna, ubah teks, tambah tombol/fitur baru), AI menerima konteks berkas yang ada, membaca berkas dengan `read_file`, dan memodifikasinya menggunakan `edit_file` atau `write_file` tanpa merusak fitur sebelumnya.
 - Otomatis melakukan `browser_test` dan mempublikasikan versi baru via `publish_app` sehingga live preview langsung ter-update.
 
+### Super Complex SaaS Architecture & Multi-Role Authentication
+- **Landing Page SaaS Lengkap**: Wajib menyajikan Hero section, Masalah vs Solusi, Modul Fitur Unggulan, Alur Kerja 3 Langkah, Pricing Table 3 Paket, FAQ interaktif, dan Footer profesional.
+- **Autentikasi Nyata Email & Password**: Menggunakan form modal/page login dan pendaftaran akun yang memvalidasi email dan kata sandi terhadap database lokal (`data/users.json` / `localStorage`), bukan sekadar tombol instan tanpa verifikasi.
+- **Pemisahan Role Tegas**:
+  - Tamu (Guest): Hanya melihat landing page dan tombol Masuk / Daftar.
+  - Administrator: Masuk ke Pusat Kontrol (KPI, visualisasi Chart.js, Master Data CRUD, dan Tab Kelola Pengguna / User Management).
+  - User / Staf Lapangan: Masuk ke Portal Operasional Staf tanpa hak akses atau tombol menu administratif.
+- **Restorasi Riwayat Chat & Sesi**:
+  - Riwayat sesi ditautkan ke `user_id: user-demo-1` di tabel `chat_sessions` dan `chat_messages` Supabase agar otomatis tampil di sidebar pengguna yang sedang aktif di browser.
+
+
 
