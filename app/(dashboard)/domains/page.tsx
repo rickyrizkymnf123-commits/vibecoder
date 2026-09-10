@@ -1,0 +1,336 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import {
+  Globe,
+  Plus,
+  CheckCircle2,
+  ExternalLink,
+  Loader2,
+  Copy,
+  Check,
+  RefreshCw,
+  ArrowLeft,
+  Server
+} from 'lucide-react';
+import { GeneratedApp } from '@/lib/types';
+
+export default function CustomDomainsPage() {
+  const [apps, setApps] = useState<GeneratedApp[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedAppId, setSelectedAppId] = useState('');
+  const [domainInput, setDomainInput] = useState('');
+  const [assigning, setAssigning] = useState(false);
+  const [dnsInstructions, setDnsInstructions] = useState<any>(null);
+  const [checkStatusLoading, setCheckStatusLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    fetchApps();
+  }, []);
+
+  const fetchApps = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/apps');
+      if (res.ok) {
+        const data = await res.json();
+        setApps(data.apps || []);
+        if (data.apps?.length > 0) {
+          setSelectedAppId(data.apps[0].id);
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleConnectDomain = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedAppId || !domainInput) return;
+
+    setAssigning(true);
+    setDnsInstructions(null);
+
+    try {
+      const res = await fetch('/api/deploy/domain', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          appId: selectedAppId,
+          customDomain: domainInput
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setDnsInstructions(data.dnsInstructions);
+        setDomainInput('');
+        fetchApps();
+      } else {
+        alert(data.error || 'Gagal menambahkan domain');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Terjadi kesalahan sistem');
+    } finally {
+      setAssigning(false);
+    }
+  };
+
+  const handleVerifyDns = async (domain: string) => {
+    setCheckStatusLoading(true);
+    try {
+      const res = await fetch(`/api/deploy/domain?domain=${encodeURIComponent(domain)}`);
+      const data = await res.json();
+      if (data.verified) {
+        alert(`Domain ${domain} terverifikasi aktif dan siap diakses!`);
+      } else {
+        alert(`DNS record untuk ${domain} belum terdeteksi. Harap tunggu proses propagasi DNS (1-15 menit).`);
+      }
+    } catch {
+      alert('Gagal mengecek status DNS');
+    } finally {
+      setCheckStatusLoading(false);
+    }
+  };
+
+  const copyText = (txt: string) => {
+    navigator.clipboard.writeText(txt);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="p-4 sm:p-8 max-w-5xl mx-auto w-full space-y-6">
+      {/* Back Link & Header (Matched with Gambar 3) */}
+      <div className="space-y-3">
+        <Link
+          href="/c/new"
+          className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Kembali ke chat</span>
+        </Link>
+        <div>
+          <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2.5">
+            <Globe className="w-6 h-6 text-violet-400" /> Custom Domain
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-400 mt-1">
+            Hubungkan nama domain kustom Anda sendiri ke aplikasi yang telah dipublish via Vercel Domains API.
+          </p>
+        </div>
+      </div>
+
+      {/* Main Connect Form Card */}
+      <div className="p-5 sm:p-6 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-xl space-y-5">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+            <span>Tambah Domain Kustom</span>
+          </h2>
+          <span className="text-[11px] text-slate-500 font-mono">Vercel Edge Network</span>
+        </div>
+
+        {apps.length === 0 && !loading ? (
+          <div className="text-xs text-amber-300 bg-amber-950/40 p-3.5 rounded-xl border border-amber-800/60">
+            Anda belum memiliki aplikasi ter-publish. Buat dan publish aplikasi terlebih dahulu sebelum menambahkan custom domain.
+          </div>
+        ) : (
+          <form onSubmit={handleConnectDomain} className="space-y-4">
+            {/* App Selection Card with NODE Badge */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-300">
+                Pilih Aplikasi Target
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {apps.map((a) => {
+                  const isSelected = selectedAppId === a.id;
+                  return (
+                    <button
+                      key={a.id}
+                      type="button"
+                      onClick={() => setSelectedAppId(a.id)}
+                      className={`p-3 rounded-xl border text-left transition-all flex items-center justify-between ${
+                        isSelected
+                          ? 'bg-violet-950/30 border-violet-500 text-white shadow-sm shadow-violet-500/10'
+                          : 'bg-slate-950/80 border-slate-800 text-slate-300 hover:border-slate-700'
+                      }`}
+                    >
+                      <div className="truncate mr-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-xs truncate">{a.name}</span>
+                          <span className="px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-400 font-mono text-[9px] font-bold border border-emerald-500/30">
+                            NODE
+                          </span>
+                        </div>
+                        <div className="text-[10px] font-mono text-slate-500 truncate mt-0.5">
+                          /{a.slug}
+                        </div>
+                      </div>
+                      <div
+                        className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
+                          isSelected
+                            ? 'border-violet-400 bg-violet-600 text-white'
+                            : 'border-slate-700 bg-slate-900'
+                        }`}
+                      >
+                        {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Wide Input with Purple 'Tambah domain' Button */}
+            <div className="space-y-1.5 pt-1">
+              <label className="block text-xs font-semibold text-slate-300">
+                Nama Domain Anda
+              </label>
+              <div className="flex flex-col sm:flex-row gap-2.5">
+                <input
+                  type="text"
+                  value={domainInput}
+                  onChange={(e) => setDomainInput(e.target.value)}
+                  placeholder="contoh: kalkulatorku.com"
+                  className="flex-1 px-4 py-2.5 sm:py-3 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs sm:text-sm focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 placeholder:text-slate-600 transition-colors"
+                  required
+                />
+                <button
+                  type="submit"
+                  disabled={assigning || !selectedAppId}
+                  className="px-6 py-2.5 sm:py-3 rounded-xl bg-violet-600 hover:bg-violet-500 active:scale-95 text-white font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-violet-600/30 transition-all disabled:opacity-50 shrink-0"
+                >
+                  {assigning ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Plus className="w-4 h-4" />
+                  )}
+                  <span>Tambah domain</span>
+                </button>
+              </div>
+            </div>
+          </form>
+        )}
+
+        {/* DNS Instructions Panel */}
+        {dnsInstructions && (
+          <div className="p-4 rounded-xl bg-violet-950/40 border border-violet-500/30 text-xs space-y-3 animate-in fade-in duration-200">
+            <div className="font-bold text-violet-300 flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Instruksi Pengaturan DNS (CNAME Record)
+            </div>
+            <p className="text-slate-300 text-[11px]">
+              Buka panel DNS manager penyedia domain Anda (Cloudflare, Niagahoster, DomaiNesia, dll) dan tambahkan DNS record berikut:
+            </p>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-950 p-3 rounded-lg font-mono text-[11px] border border-slate-800">
+              <div>
+                <span className="text-slate-500 text-[10px] uppercase block">Tipe</span>
+                <span className="text-violet-300 font-bold">{dnsInstructions.type}</span>
+              </div>
+              <div>
+                <span className="text-slate-500 text-[10px] uppercase block">Host / Nama</span>
+                <span className="text-white truncate">{dnsInstructions.host}</span>
+              </div>
+              <div>
+                <span className="text-slate-500 text-[10px] uppercase block">Value / Target</span>
+                <span className="text-emerald-400 truncate">{dnsInstructions.value}</span>
+              </div>
+              <div className="flex items-center sm:justify-end">
+                <button
+                  onClick={() => copyText(dnsInstructions.value)}
+                  className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 rounded-lg border border-slate-700 text-slate-300 flex items-center gap-1 text-[10px]"
+                >
+                  {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                  Copy
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Connected Domains Table */}
+      <div className="space-y-3">
+        <h2 className="text-sm font-bold text-white uppercase tracking-wider">
+          Daftar Aplikasi & Status Domain
+        </h2>
+
+        {loading ? (
+          <div className="text-center py-8 text-slate-500 text-xs">Memuat status domain...</div>
+        ) : apps.length === 0 ? (
+          <div className="text-xs text-slate-500 italic p-4 rounded-xl bg-slate-900/40 border border-slate-800 text-center">
+            Belum ada aplikasi yang terhubung
+          </div>
+        ) : (
+          <div className="rounded-2xl bg-slate-900/60 border border-slate-800 overflow-hidden shadow-lg">
+            <table className="w-full text-left text-xs text-slate-300">
+              <thead className="bg-slate-950 text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-800">
+                <tr>
+                  <th className="px-5 py-3">Nama Aplikasi</th>
+                  <th className="px-5 py-3">Subdomain Forge</th>
+                  <th className="px-5 py-3">Custom Domain</th>
+                  <th className="px-5 py-3">Status DNS</th>
+                  <th className="px-5 py-3 text-right">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {apps.map((app) => (
+                  <tr key={app.id} className="hover:bg-slate-800/40 transition-colors">
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-white">{app.name}</span>
+                        <span className="px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-400 font-mono text-[9px] font-bold border border-emerald-500/30">
+                          NODE
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-3.5 font-mono text-slate-400">/{app.slug}</td>
+                    <td className="px-5 py-3.5 font-mono text-violet-300">
+                      {app.custom_domain ? (
+                        <a
+                          href={`https://${app.custom_domain}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="hover:underline flex items-center gap-1"
+                        >
+                          {app.custom_domain} <ExternalLink className="w-3 h-3" />
+                        </a>
+                      ) : (
+                        <span className="text-slate-600 italic">Belum di-set</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3.5">
+                      {app.custom_domain ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1 w-fit">
+                          <CheckCircle2 className="w-3 h-3" /> Terverifikasi
+                        </span>
+                      ) : (
+                        <span className="text-slate-600">-</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3.5 text-right">
+                      {app.custom_domain && (
+                        <button
+                          onClick={() => handleVerifyDns(app.custom_domain!)}
+                          disabled={checkStatusLoading}
+                          className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium transition-colors inline-flex items-center gap-1"
+                        >
+                          <RefreshCw className={`w-3 h-3 ${checkStatusLoading ? 'animate-spin' : ''}`} />
+                          Cek DNS
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
