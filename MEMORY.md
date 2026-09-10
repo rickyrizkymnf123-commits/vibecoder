@@ -322,6 +322,9 @@
 - **Deep Transparency & Clean Markdown**:
   - Format teks balasan chat menggunakan `FormattedMessage` untuk mengeliminasi simbol mentah `**` (bold), `###` (heading), dan kurung tautan menjadi tampilan visual yang rapi dan interaktif.
   - Expander tombol `detail ▾` pada setiap aktivitas mencatat seluruh isi kode mentah (`write_file`), terminal command & stdout (`bash`), serta pengujian headless Chrome (`browser_test`) dalam kontainer scrollable yang nyaman diinspeksi pengguna.
+- **Protokol Eksekusi Otonom 5-Fase Ketat**:
+  - `lib/agent/loop.ts` menerapkan guardrail ketat sebelum mempublikasikan aplikasi via `publish_app`: wajib memiliki minimal 5 berkas modular, menjalankan skrip/pemeriksaan sintaks via terminal `bash`/`run_tests`, dan verifikasi visual `browser_test`.
+  - Riwayat sesi yang sudah selesai di masa lampau (seperti GudangKu 11 langkah) adalah snapshot statis di database. Setiap pembuatan sesi baru ("Chat Baru" / `/c/new`) atau instruksi follow-up akan mengeksekusi alur berpuluh-puluh aktivitas secara dinamis.
 - **Restorasi Riwayat Chat & Sesi**:
   - Riwayat sesi ditautkan ke `user_id: user-demo-1` di tabel `chat_sessions` dan `chat_messages` Supabase agar otomatis tampil di sidebar pengguna yang sedang aktif di browser.
 
