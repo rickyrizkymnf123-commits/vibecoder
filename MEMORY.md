@@ -299,3 +299,9 @@
 ### Headless Browser Visual Testing (VibeCoder Equivalence)
 - Tool `browser_test` dan fungsi `executeBrowserTest` di `lib/agent/executor.ts` menggunakan Google Chrome / Microsoft Edge lokal via `puppeteer-core`.
 - Memeriksa error console browser, menguji interaksi DOM, dan memotret screenshot fisik ke `workspaces/[sessionId]/screenshots/`.
+
+### Universal Dynamic Asset Bundler & Virtual API Bridge
+- Router `/api/preview/[slug]/raw` memindai berkas `.css` dan `.js` secara rekursif di seluruh subdirektori (`public/js/`, `public/css/`, dll.) dan menginjeksi inline ke HTML agar browser tidak terkena HTTP 404 saat memuat skrip klien.
+- Menginjeksi `forge-api-bridge`: Virtual API interceptor yang mencegat request `fetch('/api/...')` dan `fetch('/data/...')` lalu memprosesnya secara lokal via `localStorage`. Ini membuat seluruh formulir, modal, mutasi, dan aksi tombol berfungsi 100% interaktif tanpa dependensi backend eksternal.
+- Dilengkapi `export const dynamic = 'force-dynamic'` dan header `Cache-Control: no-cache` agar update berkas selalu disajikan secara instan ke sandbox preview.
+

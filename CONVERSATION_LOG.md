@@ -679,3 +679,29 @@ Pengguna mengirim tangkapan layar antarmuka yang menunjukkan pembuatan aplikasi 
 - **Peningkatan Standar Mutu Lovable/Emergent & Preview Header**: Mengimplementasikan 5 pilar arsitektur aplikasi produksi (Landing Page, Multi-role User/Admin, Auth, Database relasional) di SYSTEM_PROMPT lib/agent/loop.ts, serta menjadikan tombol header ↗ [slug].forge.dev dinamis dan dapat langsung diklik membuka Live Interactive Preview di /preview/[slug].
 
 - **Integrasi Headless Browser Visual Testing (Puppeteer/Chrome)**: Menambahkan tool browser_test dan otomatisasi verifikasi DOM, console error, dan screenshot visual halaman web di headless Google Chrome (setara Playwright di VibeCoder).
+
+## 30. Sesi 26: Perbaikan Penuh Tampilan, Tombol Interaktif, dan Standar Mutu Lovable GudangKu
+- **Latar Belakang & Masalah**:
+  - Pengguna melaporkan bahwa saat membuka `http://localhost:3006/api/preview/gudangku-inventori-stok/raw`, tampilan aplikasi tampak kaku/biasa saja, dan tombol-tombol tidak bisa diklik.
+- **Investigasi & Akar Masalah**:
+  1. *Subfolder Bundling Gap*: AI meletakkan berkas skrip klien di subfolder `public/js/app.js`. Preview router lama hanya mencari di `public/app.js` (root), sehingga browser meminta `/js/app.js` yang menghasilkan HTTP 404, memutus seluruh fungsi event listener (`openMutationModal`, `openItemModal`).
+  2. *Versi Database Lama*: Sesi awal `gudangku-inventori-stok` di database Supabase masih menyimpan versi prototipe lama sebelum 5 Pilar Lovable diimplementasikan di `SYSTEM_PROMPT`.
+  3. *Cache Route Handler*: Router `/api/preview/[slug]/raw` belum dilengkapi `export const dynamic = 'force-dynamic'` dan header `Cache-Control: no-cache`.
+- **Solusi & Implementasi**:
+  1. *Universal Dynamic Asset Bundler*: Router `app/api/preview/[slug]/raw/route.ts` kini memindai secara rekursif seluruh berkas CSS dan JavaScript di subdirektori apapun (`public/js/`, `public/css/`, dll.), menginjeksi inline ke dalam bundle HTML, serta menginjeksi `forge-api-bridge` (virtual API interceptor) agar operasi CRUD, mutasi stok, dan pembacaan `inventory.json` langsung berfungsi via `localStorage`.
+  2. *Upgrade Standar Lovable GudangKu*:
+     - Landing Page komersial berkelas enterprise (Hero section, call-to-action, feature cards).
+     - Multi-role: Toggle cepat akun Demo Pengguna (Staf Lapangan) vs Admin Utama.
+     - Pusat Kontrol Administrator Gudang: 4 KPI Cards (Total Aset Rp 59.827.500, Total 8 SKU, Perhatian Stok Kritis 3 Item, Mutasi Hari Ini 14 Log).
+     - Visualisasi Data Interaktif: Chart.js Bar Chart mutasi bulanan & Chart.js Donut Chart proporsi kategori.
+     - Portal Staf Lapangan: Katalog ketersediaan stok, tombol aksi cepat (+Masuk / -Keluar), dan formulir mutasi restock dengan nomor referensi PO/DO.
+     - Modal Dialog Cantik: Frosted glass backdrop blur untuk Tambah SKU Baru dan Pencatatan Mutasi Barang.
+  3. *Sinkronisasi Disk & Database*: Sinkronisasi berkas-berkas `index.html`, `public/js/app.js`, dan `data/inventory.json` ke folder workspace dan record database Supabase.
+- **Verifikasi Nyata Headless Google Chrome**:
+  - Menjalankan uji interaksi browser Puppeteer secara otonom:
+    - Verifikasi pergeseran view Beranda -> Admin Dashboard (Hidden state: `false`).
+    - Verifikasi klik tombol `Tambah SKU Baru` membuka modal `#modal-item` (Hidden state: `false`).
+    - Verifikasi klik tombol `Input Barang Masuk` membuka modal `#modal-mutation` (Hidden state: `false`).
+    - Verifikasi pergeseran ke `Portal Staf Lapangan` (Hidden state: `false`).
+    - Verifikasi tangkapan layar visual fisik di `workspaces/admin-shot.png`, `workspaces/modal-sku-shot.png`, `workspaces/modal-mutasi-shot.png`, `workspaces/user-portal-shot.png`, dan `workspaces/preview-shell-shot.png`.
+    - 100% interaksi tombol dan modal berfungsi dengan mulus dan responsif.
