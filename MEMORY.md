@@ -295,3 +295,7 @@
 ### Lovable/Emergent Architecture Contract
 - Seluruh aplikasi web yang dihasilkan AI wajib memuat: Landing page komersial, Modal/page Login & Register dengan switch role (User vs Admin), User Dashboard mandiri, Admin Dashboard dengan master data CRUD & grafik statistik (Chart.js), dan skema relasional di data/*.json.
 - Tombol header domain di top bar harus selalu merujuk ke /preview/[slug] aktif.
+
+### Headless Browser Visual Testing (VibeCoder Equivalence)
+- Tool `browser_test` dan fungsi `executeBrowserTest` di `lib/agent/executor.ts` menggunakan Google Chrome / Microsoft Edge lokal via `puppeteer-core`.
+- Memeriksa error console browser, menguji interaksi DOM, dan memotret screenshot fisik ke `workspaces/[sessionId]/screenshots/`.

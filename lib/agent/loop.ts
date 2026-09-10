@@ -13,6 +13,7 @@ import {
   executeEditFile,
   executeBash,
   executeRunTests,
+  executeBrowserTest,
   executePublishApp,
   getWorkspaceDir,
   collectAllFiles
@@ -101,6 +102,7 @@ ALUR KERJA RE-ACT (Reasoning + Action) MUTLAK:
    - Tulis seluruh berkas fisik di atas satu per satu menggunakan 'write_file'. JANGAN pernah gunakan placeholder atau komentar TODO kosong.
 3. **Pemeriksaan & Pengujian Nyata**:
    - Gunakan 'bash' untuk memeriksa sintaks: 'node --check server.js' dan jalankan pengujian 'node test/app-test.js'.
+   - Gunakan tool 'browser_test' untuk menjalankan verifikasi visual di headless Google Chrome (persis seperti yang dilakukan VibeCoder): membuka antarmuka web di browser fisik, mengeklik tombol, memvalidasi 0 console error, dan memotret screenshot visual UI.
    - JIKA ADA ERROR: Baca error stderr, analisis penyebabnya, dan gunakan 'edit_file' atau 'write_file' untuk memperbaikinya sendiri sampai berhasil.
 4. **Penerbitan Aplikasi**:
    - Panggil tool 'publish_app' dengan 'appName' dan 'slug'.
@@ -232,6 +234,19 @@ export async function runAgenticLoop(options: RunAgentOptions): Promise<AgentRun
       const tc = await recordToolStart('bash', `Terminal Shell: ${args.command}`, args);
       resultOutput = await executeBash(sessionId, args.command);
       await recordToolFinish(tc, resultOutput, resultOutput.success ? 'completed' : 'failed');
+    } else if (name === 'browser_test') {
+      const tc = await recordToolStart('browser_test', 'Verifikasi Visual Headless Browser (Google Chrome)', args);
+      try {
+        const bRes = await executeBrowserTest(sessionId, {
+          targetUrl: args.url_or_path ? (args.url_or_path.startsWith('http') ? args.url_or_path : `http://localhost:3006${args.url_or_path}`) : undefined,
+          interactions: args.interactions
+        });
+        resultOutput = bRes;
+        await recordToolFinish(tc, bRes, bRes.success ? 'completed' : 'failed');
+      } catch (e: any) {
+        resultOutput = { success: false, error: e.message };
+        await recordToolFinish(tc, resultOutput, 'failed');
+      }
     } else if (name === 'run_tests') {
       const tc = await recordToolStart('run_tests', 'Menjalankan pengujian sintaks & skrip nyata di workspace', args);
       resultOutput = await executeRunTests(sessionId, args.test_type);

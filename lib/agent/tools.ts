@@ -10,6 +10,32 @@ export interface GeminiFunctionDeclaration {
 
 export const AGENT_TOOLS: GeminiFunctionDeclaration[] = [
   {
+    name: 'browser_test',
+    description: 'Membuka aplikasi web di headless browser (Google Chrome / Chromium), mengeklik tombol navigasi/modal, memeriksa error console JavaScript browser, dan memotret screenshot visual halaman untuk memvalidasi bahwa tampilan UI berfungsi sempurna tanpa bug visual.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        url_or_path: {
+          type: 'STRING',
+          description: 'URL atau path preview aplikasi, misalnya "/api/preview/[slug]/raw" atau "public/index.html"'
+        },
+        interactions: {
+          type: 'ARRAY',
+          description: 'Daftar interaksi klik atau ketik yang ingin diuji di browser',
+          items: {
+            type: 'OBJECT',
+            properties: {
+              action: { type: 'STRING', description: 'Tindakan: "click", "type", atau "wait"' },
+              selector: { type: 'STRING', description: 'CSS selector elemen yang diklik/diketik' },
+              value: { type: 'STRING', description: 'Nilai teks jika action adalah type' }
+            },
+            required: ['action']
+          }
+        }
+      }
+    }
+  },
+  {
     name: 'write_file',
     description: 'Menulis atau membuat berkas fisik baru ke dalam filesystem workspace proyek. Seluruh berkas pendukung aplikasi (HTML, CSS, JS, TS, JSON, SQL) harus benar-benar ditulis ke disk.',
     parameters: {

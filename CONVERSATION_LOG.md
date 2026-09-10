@@ -677,3 +677,5 @@ Pengguna mengirim tangkapan layar antarmuka yang menunjukkan pembuatan aplikasi 
 - **Proses /learn & Proposal Mutu Aplikasi**: Menyusun proposal standar arsitektur Lovable/Emergent (Landing page, Multi-role User/Admin dashboard, Auth, Database) dan navigasi preview header di learning_proposal.md tanpa mengubah kode sebelum disetujui.
 
 - **Peningkatan Standar Mutu Lovable/Emergent & Preview Header**: Mengimplementasikan 5 pilar arsitektur aplikasi produksi (Landing Page, Multi-role User/Admin, Auth, Database relasional) di SYSTEM_PROMPT lib/agent/loop.ts, serta menjadikan tombol header ↗ [slug].forge.dev dinamis dan dapat langsung diklik membuka Live Interactive Preview di /preview/[slug].
+
+- **Integrasi Headless Browser Visual Testing (Puppeteer/Chrome)**: Menambahkan tool browser_test dan otomatisasi verifikasi DOM, console error, dan screenshot visual halaman web di headless Google Chrome (setara Playwright di VibeCoder).
