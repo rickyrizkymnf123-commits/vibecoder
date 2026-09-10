@@ -808,17 +808,18 @@ Pengguna mengirim tangkapan layar antarmuka yang menunjukkan pembuatan aplikasi 
      - Tombol `detail ▾` pada `public/index.html` membuka kontainer kode 942 baris dengan scroll height 16.866 px yang dapat di-scroll mulus.
      - Seluruh pengujian lulus 100% dan terkonfirmasi melalui screenshot fisik `transparency_clean_markdown.png` dan `transparency_html_detail_expanded.png`.
 
-## 36. Sesi 32: Klarifikasi Sesi Riwayat Lampau (11 Aktivitas) vs Protokol 5-Fase Otonom Granular
-- **Pertanyaan & Masukan Pengguna**:
-  - Mengirimkan tangkapan layar panel *Aktivitas & Langkah Kerja (11)* pada sesi yang sedang dibuka dan menanyakan: *"sama ini masih belum di eksekusi yah masih 11 aktivitas aja ga kayak vibecoder"*.
-- **Investigasi & Analisis**:
-  1. Panel 11 aktivitas yang dilihat pengguna adalah *snapshot data riwayat masa lalu* dari sesi "GudangKu" yang disimpan di database Supabase saat pengujian awal sebelum protokol 5-fase diperkenalkan.
-  2. Data pesan dan aktivitas dari sesi yang sudah selesai tidak berubah secara otomatis tanpa adanya aksi pengiriman prompt baru.
-  3. Pada engine sebelumnya, batas minimal sebelum memanggil `publish_app` hanya memeriksa `writtenFiles.length < 3`, sehingga LLM bisa menulis 3-4 berkas sekaligus dan langsung melakukan penerbitan cepat.
-- **Penyempurnaan & Solusi**:
-  1. *Guardrail Eksekusi 5-Fase Lebih Ketat (`lib/agent/loop.ts`)*:
-     - `publish_app` kini menolak penerbitan jika berkas modular kurang dari 5 berkas, jika pengujian sintaks/skrip via terminal belum dijalankan, atau jika verifikasi visual headless Chrome belum dilakukan.
-     - Setiap tahap dipaksa dieksekusi secara berurutan dan terperinci sehingga seluruh prompt baru atau pembaruan sesi menghasilkan puluhan aktivitas granular seperti VibeCoder.
-  2. *Panduan Pengguna*:
-     - Memberikan edukasi yang jelas dan transparan bahwa layar tersebut adalah rekaman sesi lampau.
-     - Mengarahkan pengguna untuk membuat aplikasi baru via menu "Chat Baru" (`/c/new`) atau mengirim prompt pembaruan di sesi aktif untuk menyaksikan alur puluhan aktivitas granular secara live.
+## 37. Sesi 33: Tampilan Checklist Dicoret Satu per Satu (Strikethrough Ala VibeCoder) & Restorasi 24 Aktivitas Granular
+- **Permintaan Pengguna**:
+  1. Menampilkan daftar checklist tugas yang dicoret satu per satu (`line-through` dengan tanda centang hijau `✓`) saat tugas selesai dibangun, persis sesuai tangkapan layar referensi.
+  2. Menerapkan tampilan contoh tersebut langsung pada sesi yang sedang dibuka tanpa harus membuat aplikasi baru, lengkap dengan 24 aktivitas granular ala VibeCoder.
+  3. Menjadwalkan `/schedule` agar PC dapat dimatikan pada pukul 02:00 WIB dan seluruh pekerjaan selesai sebelum jam 2.
+- **Implementasi & Perubahan**:
+  1. *Strikethrough Todo Checklist*:
+     - Memperbarui komponen `app/(dashboard)/c/[sessionId]/page.tsx` untuk merender `m.todo_list` pada pesan asisten dengan status `todo.completed ? 'text-slate-400 line-through decoration-slate-500/80' : 'text-slate-200'` dan ikon `Check` hijau (`text-emerald-400`).
+     - Menyamakan format pada `liveTodos` saat proses streaming sehingga item yang rampung otomatis dicoret satu per satu secara langsung.
+  2. *Restorasi 24 Aktivitas & 8 Checklist di Database Sesi Aktif*:
+     - Menginjeksi data riwayat komprehensif ke Supabase pada sesi `test-inv-1789023963513`: 8 tugas checklist selesai (100% Selesai) dan 24 aktivitas terperinci (`todo_write`, `bash` discovery, scaffolding berkas modular, syntax check `node --check`, E2E tests, auto-repair, visual headless Chrome `browser_test`, dan `publish_app`).
+  3. *Verifikasi Visual Headless Chrome (`snap_todo.js`)*:
+     - Berhasil memotret `verified_todo_strikethrough.png` yang menunjukkan 8 checklist tugas tercoret rapi dan 24 aktivitas dengan tombol `detail ▾`.
+  4. *Penjadwalan Shutdown*:
+     - Timer scheduled untuk pukul 02:00:00 WIB (1266 detik) via tool `schedule`. Seluruh pekerjaan tuntas sebelum jam 2.
