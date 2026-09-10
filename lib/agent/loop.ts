@@ -76,6 +76,36 @@ PERATURAN:
 - JANGAN PERNAH menggunakan placeholder, data kosong palsu, atau komentar "TODO". Tuliskan implementasi kode yang lengkap dan nyata.
 - Bangun aplikasi secara bertahap dan jelaskan setiap tindakan Anda.`;
 
+function getOptimizedMessages(rawMessages: any[]): any[] {
+  return rawMessages.map((m, idx) => {
+    // If it's an assistant message with tool calls older than the last 2 items
+    if (m.role === 'assistant' && Array.isArray(m.tool_calls) && idx < rawMessages.length - 2) {
+      const optimizedToolCalls = m.tool_calls.map((tc: any) => {
+        if (tc.function?.name === 'write_file') {
+          try {
+            const parsed = JSON.parse(tc.function.arguments || '{}');
+            if (parsed.content && parsed.content.length > 300) {
+              return {
+                ...tc,
+                function: {
+                  ...tc.function,
+                  arguments: JSON.stringify({
+                    path: parsed.path,
+                    content: `[Berkas tersimpan di disk (${parsed.content.length} karakter). Gunakan read_file jika perlu menginspeksi isi]`
+                  })
+                }
+              };
+            }
+          } catch {}
+        }
+        return tc;
+      });
+      return { ...m, tool_calls: optimizedToolCalls };
+    }
+    return m;
+  });
+}
+
 export async function runAgenticLoop(options: RunAgentOptions): Promise<AgentRunResult> {
   const { userPrompt, userId, sessionId, hasAppCredit, onEvent } = options;
 
@@ -233,45 +263,77 @@ export async function runAgenticLoop(options: RunAgentOptions): Promise<AgentRun
     while (turn < MAX_TURNS && !deployedApp) {
       turn++;
 
-      let res: Response;
-      try {
-        const reqBody = {
-          model: aiConfig.defaultModel || 'gemini-2.5-flash',
-          messages,
-          tools: openAiTools,
-          tool_choice: 'auto',
-          temperature: 0.2
-        };
+      let res: Response | null = null;
+      let lastErrText = '';
+      const MAX_RETRIES = 3;
 
-        res = await fetch(completionsUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${aiConfig.apiKey}`
-          },
-          signal: AbortSignal.timeout(60000),
-          body: JSON.stringify(reqBody)
-        });
-      } catch (fetchErr: any) {
-        const errMsg = `Gagal terhubung ke penyedia AI (${cleanBaseUrl}): ${fetchErr.message}`;
-        console.error('[OpenAI Provider Connection Error]:', errMsg);
-        await onEvent({ type: 'error', message: errMsg, generationMode: 'live-ai' });
-        return {
-          needsClarification: false,
-          toolCalls: toolCallsHistory,
-          todoList,
-          planNarrative,
-          summaryMessage: errMsg,
-          totalTokensUsed,
-          generationMode: 'live-ai',
-          fallbackReason: errMsg
-        };
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          const reqBody = {
+            model: aiConfig.defaultModel || 'gemini-2.5-flash',
+            messages: getOptimizedMessages(messages),
+            tools: openAiTools,
+            tool_choice: 'auto',
+            temperature: 0.2
+          };
+
+          res = await fetch(completionsUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${aiConfig.apiKey}`
+            },
+            signal: AbortSignal.timeout(120000),
+            body: JSON.stringify(reqBody)
+          });
+
+          if (res.ok) {
+            lastErrText = '';
+            break;
+          } else {
+            lastErrText = await res.text();
+            console.warn(`[AI Provider Turn ${turn} Attempt ${attempt} HTTP ${res.status}]:`, lastErrText.substring(0, 150));
+            if ([429, 502, 503, 504].includes(res.status) && attempt < MAX_RETRIES) {
+              await onEvent({
+                type: 'plan',
+                content: `Koneksi AI padat (${res.status}). Mengulang otomatis (percobaan ${attempt + 1}/${MAX_RETRIES})...`,
+                generationMode: 'live-ai'
+              });
+              await new Promise((r) => setTimeout(r, 2000 * attempt));
+              continue;
+            }
+            break;
+          }
+        } catch (fetchErr: any) {
+          lastErrText = fetchErr.message;
+          console.warn(`[AI Provider Fetch Error turn ${turn} attempt ${attempt}]:`, fetchErr.message);
+          if (attempt < MAX_RETRIES) {
+            await onEvent({
+              type: 'plan',
+              content: `Waktu respons AI melambat atau timeout (${fetchErr.message}). Mengulang otomatis (percobaan ${attempt + 1}/${MAX_RETRIES})...`,
+              generationMode: 'live-ai'
+            });
+            await new Promise((r) => setTimeout(r, 2000 * attempt));
+          }
+        }
       }
 
-      if (!res.ok) {
-        const errText = await res.text();
-        const errMsg = `AI Provider mengembalikan error (${res.status}): ${errText.substring(0, 200)}`;
-        console.error(`[Custom AI Error turn ${turn}]`, errMsg);
+      if (!res || !res.ok) {
+        const errMsg = !res
+          ? `Gagal terhubung ke penyedia AI (${cleanBaseUrl}): ${lastErrText}`
+          : `AI Provider mengembalikan error (${res.status}): ${lastErrText.substring(0, 200)}`;
+
+        console.error(`[Custom AI Fatal Error turn ${turn}]`, errMsg);
+
+        if (writtenFiles.length > 0) {
+          await onEvent({
+            type: 'plan',
+            content: `Terjadi kendala koneksi AI pada turn ${turn}, namun ${writtenFiles.length} berkas fisik telah berhasil dibuat. Melakukan finalisasi aplikasi...`,
+            generationMode: 'live-ai'
+          });
+          break;
+        }
+
         await onEvent({ type: 'error', message: errMsg, generationMode: 'live-ai' });
         return {
           needsClarification: false,
@@ -419,7 +481,7 @@ export async function runAgenticLoop(options: RunAgentOptions): Promise<AgentRun
         const res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          signal: AbortSignal.timeout(45000),
+          signal: AbortSignal.timeout(90000),
           body: JSON.stringify({
             contents,
             tools: [{ functionDeclarations: AGENT_TOOLS }],

@@ -286,3 +286,8 @@
 - Tool fisik: write_file, read_file, edit_file, bash (Git Bash di Windows), run_tests, publish_app, todo_write.
 - AI memiliki kapabilitas self-repair (membaca stderr terminal dan memperbaiki kodenya sendiri).
 - Live Preview merender HTML/JS buatan AI via iframe sandbox di /api/preview/[slug]/raw dan menyediakan Code Explorer di /preview/[slug].
+
+### AI Provider Stability & Payload Optimization
+- **Timeout**: Set minimal 120s pada ReAct loop untuk mencegah premature abort saat model menulis kode besar.
+- **Payload Compression**: Gunakan `getOptimizedMessages` untuk meringkas argumen `content` pada tool call `write_file` lama di riwayat multi-turn. Ini mencegah eksploitasi konteks token dan mempercepat respons inferensi.
+- **Auto-Retry**: Selalu sertakan 3x auto-retry pada fetch call AI provider.
