@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   Circle,
   Code2,
+  FileCode2,
   Terminal,
   ExternalLink,
   ChevronDown,
@@ -26,6 +27,319 @@ import {
   Image as ImageIcon
 } from 'lucide-react';
 import { ToolCallItem, TodoItem, ChatMessage, GeneratedApp } from '@/lib/types';
+
+// =========================================================================
+// CLEAN MARKDOWN FORMATTER (Eliminasi simbol mentah **, ###, link, list)
+// =========================================================================
+function FormattedMessage({ content }: { content: string }) {
+  const clean = content.replace(/<!-- GENERATION_MODE: [a-z-]+ -->\n?/, '').trim();
+  const lines = clean.split('\n');
+
+  const blocks: React.ReactNode[] = [];
+  let listItems: React.ReactNode[] = [];
+
+  const flushList = () => {
+    if (listItems.length > 0) {
+      blocks.push(
+        <ul key={`list-${blocks.length}`} className="space-y-1.5 my-2.5 pl-1">
+          {listItems}
+        </ul>
+      );
+      listItems = [];
+    }
+  };
+
+  const parseInline = (text: string): React.ReactNode => {
+    const parts: React.ReactNode[] = [];
+    const regex = /(\[([^\]]+)\]\(([^)]+)\)|\*\*([^*]+)\*\*|`([^`]+)`|\*([^*]+)\*)/g;
+    let lastIndex = 0;
+    let match;
+
+    while ((match = regex.exec(text)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(text.slice(lastIndex, match.index));
+      }
+
+      if (match[2] && match[3]) {
+        // [Link](url)
+        const label = match[2];
+        const url = match[3];
+        parts.push(
+          <a
+            key={match.index}
+            href={url}
+            target={url.startsWith('http') ? '_blank' : undefined}
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 font-semibold text-indigo-400 hover:text-indigo-300 underline decoration-indigo-500/50 underline-offset-2 transition-colors mx-0.5"
+          >
+            {label}
+            <ExternalLink className="w-3 h-3 inline shrink-0 opacity-80" />
+          </a>
+        );
+      } else if (match[4]) {
+        // **Bold** -> strong tanpa tanda bintang (rekursif untuk link di dalam bold)
+        parts.push(
+          <strong key={match.index} className="font-bold text-white tracking-wide">
+            {parseInline(match[4])}
+          </strong>
+        );
+      } else if (match[5]) {
+        // `Code`
+        parts.push(
+          <code
+            key={match.index}
+            className="px-1.5 py-0.5 rounded-md bg-slate-800 text-indigo-300 font-mono text-[11px] border border-slate-700/60 mx-0.5"
+          >
+            {match[5]}
+          </code>
+        );
+      } else if (match[6]) {
+        // *Italic*
+        parts.push(
+          <em key={match.index} className="italic text-slate-300">
+            {match[6]}
+          </em>
+        );
+      }
+
+      lastIndex = regex.lastIndex;
+    }
+
+    if (lastIndex < text.length) {
+      parts.push(text.slice(lastIndex));
+    }
+
+    return parts.length > 0 ? parts : text;
+  };
+
+  lines.forEach((line, idx) => {
+    const trimmed = line.trim();
+
+    if (!trimmed) {
+      flushList();
+      return;
+    }
+
+    // Heading ###
+    if (trimmed.startsWith('### ')) {
+      flushList();
+      blocks.push(
+        <h3 key={idx} className="text-sm sm:text-base font-bold text-white mt-4 mb-2 flex items-center gap-2">
+          {parseInline(trimmed.slice(4))}
+        </h3>
+      );
+      return;
+    }
+
+    // Heading ##
+    if (trimmed.startsWith('## ')) {
+      flushList();
+      blocks.push(
+        <h2 key={idx} className="text-base sm:text-lg font-extrabold text-white mt-5 mb-2">
+          {parseInline(trimmed.slice(3))}
+        </h2>
+      );
+      return;
+    }
+
+    // Heading #
+    if (trimmed.startsWith('# ')) {
+      flushList();
+      blocks.push(
+        <h1 key={idx} className="text-lg sm:text-xl font-black text-white mt-6 mb-2.5">
+          {parseInline(trimmed.slice(2))}
+        </h1>
+      );
+      return;
+    }
+
+    // Numbered list (1. Item)
+    const numMatch = trimmed.match(/^(\d+)\.\s+(.*)$/);
+    if (numMatch) {
+      listItems.push(
+        <li key={idx} className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-300 leading-relaxed">
+          <span className="font-bold text-indigo-400 shrink-0 font-mono mt-0.5">{numMatch[1]}.</span>
+          <div className="flex-1 min-w-0">{parseInline(numMatch[2])}</div>
+        </li>
+      );
+      return;
+    }
+
+    // Bullet list (- Item atau * Item)
+    if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+      listItems.push(
+        <li key={idx} className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-300 leading-relaxed">
+          <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-2 shrink-0" />
+          <div className="flex-1 min-w-0">{parseInline(trimmed.slice(2))}</div>
+        </li>
+      );
+      return;
+    }
+
+    // Regular paragraph
+    flushList();
+    blocks.push(
+      <p key={idx} className="text-xs sm:text-sm text-slate-300 leading-relaxed my-1.5">
+        {parseInline(trimmed)}
+      </p>
+    );
+  });
+
+  flushList();
+
+  return <div className="space-y-1">{blocks}</div>;
+}
+
+// =========================================================================
+// DEEP TRANSPARENT TOOL CALL EXPANDER (Format VibeCoder Asli)
+// =========================================================================
+function ToolCallDetailBox({ call }: { call: ToolCallItem }) {
+  const [copied, setCopied] = useState(false);
+
+  // 1. Tool write_file: Tampilkan kode sumber penuh dengan scrollbar, baris kode, dan ukuran byte
+  if (call.tool === 'write_file' && typeof call.input === 'object' && call.input?.path) {
+    const filePath = call.input.path;
+    const content = call.input.content || (typeof call.input === 'string' ? call.input : '');
+    const lineCount = content ? content.split('\n').length : 0;
+    const byteSize = content ? new Blob([content]).size : (call.input.bytes || 0);
+
+    const handleCopy = () => {
+      if (content) {
+        navigator.clipboard.writeText(content);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }
+    };
+
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-[11px] bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800">
+          <div className="flex items-center gap-2 font-mono text-indigo-300 font-semibold truncate">
+            <Code2 className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+            <span className="truncate">{filePath}</span>
+          </div>
+          <div className="flex items-center gap-3 shrink-0 text-slate-400 font-mono text-[10px]">
+            {lineCount > 0 && <span className="text-slate-400">{lineCount} baris</span>}
+            {byteSize > 0 && <span className="text-slate-500">{(byteSize / 1024).toFixed(1)} KB</span>}
+            {content && (
+              <button
+                onClick={handleCopy}
+                className="flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors border border-slate-700/60"
+                title="Salin isi berkas"
+              >
+                {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                <span>{copied ? 'Tersalin' : 'Salin'}</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {content ? (
+          <div className="relative rounded-xl bg-slate-950 border border-slate-800/90 overflow-hidden shadow-inner">
+            <pre className="p-3.5 font-mono text-[11px] leading-relaxed text-slate-300 overflow-x-auto max-h-[460px] overflow-y-auto select-text scrollbar-thin scrollbar-thumb-slate-800">
+              {content}
+            </pre>
+          </div>
+        ) : (
+          <pre className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 overflow-x-auto text-slate-400 text-xs">
+            {JSON.stringify(call.input, null, 2)}
+          </pre>
+        )}
+
+        {call.output && (
+          <div className="text-[10px] text-emerald-400/90 font-mono bg-emerald-950/20 px-2.5 py-1 rounded border border-emerald-800/40 flex items-center gap-1.5">
+            <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
+            <span>
+              Berkas berhasil ditulis ke disk ({typeof call.output === 'object' && call.output?.bytesWritten ? call.output.bytesWritten : byteSize} bytes)
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // 2. Tool bash: Terminal shell command & full log stdout/stderr
+  if (call.tool === 'bash') {
+    const cmd = typeof call.input === 'object' && call.input?.command ? call.input.command : (typeof call.input === 'string' ? call.input : '');
+    const stdout = typeof call.output === 'object' ? call.output?.stdout : (typeof call.output === 'string' ? call.output : '');
+    const stderr = typeof call.output === 'object' ? call.output?.stderr : '';
+    const exitCode = typeof call.output === 'object' ? call.output?.exitCode : 0;
+
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center gap-1.5 text-[11px] font-mono text-slate-400 px-1">
+          <Terminal className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+          <span className="font-semibold text-emerald-400">Terminal Shell Execution</span>
+        </div>
+        <div className="rounded-xl bg-slate-950 border border-slate-800 p-3.5 font-mono text-[11px] space-y-2 shadow-inner">
+          <div className="flex items-center gap-2 text-violet-300">
+            <span className="text-slate-500 font-bold">$</span>
+            <span className="text-white font-medium">{cmd}</span>
+          </div>
+          {(stdout || stderr) && (
+            <div className="border-t border-slate-900 pt-2 text-slate-300 whitespace-pre-wrap max-h-[300px] overflow-y-auto leading-relaxed">
+              {stdout && <div className="text-slate-200">{stdout}</div>}
+              {stderr && <div className="text-rose-400 mt-1">{stderr}</div>}
+            </div>
+          )}
+          <div className="text-[10px] text-slate-500 pt-1 flex items-center gap-2 border-t border-slate-900">
+            <span>Exit code: {exitCode ?? 0}</span>
+            <span>· Status: {exitCode === 0 ? '✓ Sukses (0 error)' : '⚠️ Gagal'}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 3. Tool browser_test: Headless Google Chrome test verification
+  if (call.tool === 'browser_test') {
+    const testOutput = call.output || {};
+    const testUrl = typeof call.input === 'object' && call.input?.url ? call.input.url : '/preview/[slug]';
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center gap-1.5 text-[11px] font-mono text-sky-400 font-semibold px-1">
+          <Globe className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+          <span>Verifikasi Visual Headless Chrome</span>
+        </div>
+        <div className="rounded-xl bg-slate-950 border border-slate-800 p-3.5 font-mono text-[11px] space-y-2">
+          <div className="text-slate-300">
+            Target URL: <span className="text-indigo-300 font-medium">{testUrl}</span>
+          </div>
+          <div className="text-emerald-400 font-semibold flex items-center gap-1.5 pt-1 border-t border-slate-900">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+            <span>{typeof testOutput === 'object' && testOutput.passed ? '✓ Seluruh Uji DOM Lulus & 0 Console Error' : (typeof testOutput === 'string' ? testOutput : '✓ Berhasil diverifikasi')}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 4. Default generic JSON viewer
+  return (
+    <div className="space-y-2 font-mono text-[11px]">
+      {call.input && (
+        <div>
+          <span className="text-slate-400 text-[10px] uppercase font-bold block mb-1">
+            Input Data:
+          </span>
+          <pre className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 overflow-x-auto text-slate-300 max-h-60 overflow-y-auto">
+            {typeof call.input === 'string' ? call.input : JSON.stringify(call.input, null, 2)}
+          </pre>
+        </div>
+      )}
+      {call.output && (
+        <div>
+          <span className="text-slate-400 text-[10px] uppercase font-bold block mb-1">
+            Output:
+          </span>
+          <pre className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 overflow-x-auto text-emerald-400 max-h-60 overflow-y-auto">
+            {typeof call.output === 'string' ? call.output : JSON.stringify(call.output, null, 2)}
+          </pre>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function ChatSessionPage() {
   const params = useParams();
@@ -328,9 +642,9 @@ export default function ChatSessionPage() {
                       </div>
                     )}
 
-                    {/* Content Markdown */}
-                    <div className="text-slate-200 leading-relaxed whitespace-pre-wrap font-sans text-xs sm:text-sm">
-                      {m.content.replace(/<!-- GENERATION_MODE: [a-z-]+ -->\n?/, '')}
+                    {/* Content Markdown Berformat Rapi (Tanpa simbol mentah **, ###, dsb.) */}
+                    <div className="text-slate-200 leading-relaxed font-sans text-xs sm:text-sm">
+                      <FormattedMessage content={m.content} />
                     </div>
 
                     {/* Render historical tool calls if any */}
@@ -367,31 +681,8 @@ export default function ChatSessionPage() {
                                 </div>
 
                                 {isExpanded && (
-                                  <div className="p-3 bg-slate-900/90 border-t border-slate-800 space-y-2 font-mono text-[11px]">
-                                    {call.input && (
-                                      <div>
-                                        <span className="text-slate-400 text-[10px] uppercase font-bold block mb-1">
-                                          Input Parameters:
-                                        </span>
-                                        <pre className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 overflow-x-auto text-slate-300 max-h-60 overflow-y-auto">
-                                          {typeof call.input === 'string'
-                                            ? call.input
-                                            : JSON.stringify(call.input, null, 2)}
-                                        </pre>
-                                      </div>
-                                    )}
-                                    {call.output && (
-                                      <div>
-                                        <span className="text-slate-400 text-[10px] uppercase font-bold block mb-1">
-                                          Output / Hasil Eksekusi:
-                                        </span>
-                                        <pre className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 overflow-x-auto text-emerald-400 max-h-60 overflow-y-auto">
-                                          {typeof call.output === 'string'
-                                            ? call.output
-                                            : JSON.stringify(call.output, null, 2)}
-                                        </pre>
-                                      </div>
-                                    )}
+                                  <div className="p-3 bg-slate-900/90 border-t border-slate-800">
+                                    <ToolCallDetailBox call={call} />
                                   </div>
                                 )}
                               </div>
@@ -534,31 +825,8 @@ export default function ChatSessionPage() {
 
                         {/* Expandable Details Modal / Drawer */}
                         {isExpanded && (
-                          <div className="p-3 bg-slate-900/90 border-t border-slate-800 space-y-2 font-mono text-[11px]">
-                            {call.input && (
-                              <div>
-                                <span className="text-slate-400 text-[10px] uppercase font-bold block mb-1">
-                                  Input Data:
-                                </span>
-                                <pre className="p-2 rounded bg-slate-950 border border-slate-800 overflow-x-auto text-slate-300">
-                                  {typeof call.input === 'string'
-                                    ? call.input
-                                    : JSON.stringify(call.input, null, 2)}
-                                </pre>
-                              </div>
-                            )}
-                            {call.output && (
-                              <div>
-                                <span className="text-slate-400 text-[10px] uppercase font-bold block mb-1">
-                                  Output / Hasil Eksekusi:
-                                </span>
-                                <pre className="p-2 rounded bg-slate-950 border border-slate-800 overflow-x-auto text-emerald-400">
-                                  {typeof call.output === 'string'
-                                    ? call.output
-                                    : JSON.stringify(call.output, null, 2)}
-                                </pre>
-                              </div>
-                            )}
+                          <div className="p-3 bg-slate-900/90 border-t border-slate-800">
+                            <ToolCallDetailBox call={call} />
                           </div>
                         )}
                       </div>

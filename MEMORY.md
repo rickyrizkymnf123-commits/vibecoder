@@ -319,6 +319,9 @@
   - User / Staf Lapangan: Masuk ke Portal Operasional Staf tanpa hak akses atau tombol menu administratif.
 - **Isolasi Mutlak Navbar Header**:
   - Tautan marketing Landing Page (Solusi Bisnis, 6 Modul, Cara Kerja, dsb.) WAJIB disembunyikan total ('display: none') saat pengguna sudah login (baik Admin maupun User/Staf). Header aplikasi internal hanya menampilkan logo, tab/menu dashboard peran aktif, profil pengguna, dan tombol Logout.
+- **Deep Transparency & Clean Markdown**:
+  - Format teks balasan chat menggunakan `FormattedMessage` untuk mengeliminasi simbol mentah `**` (bold), `###` (heading), dan kurung tautan menjadi tampilan visual yang rapi dan interaktif.
+  - Expander tombol `detail ▾` pada setiap aktivitas mencatat seluruh isi kode mentah (`write_file`), terminal command & stdout (`bash`), serta pengujian headless Chrome (`browser_test`) dalam kontainer scrollable yang nyaman diinspeksi pengguna.
 - **Restorasi Riwayat Chat & Sesi**:
   - Riwayat sesi ditautkan ke `user_id: user-demo-1` di tabel `chat_sessions` dan `chat_messages` Supabase agar otomatis tampil di sidebar pengguna yang sedang aktif di browser.
 

@@ -242,7 +242,11 @@ ATURAN WAJIB UNTUK PERUBAHAN / ITERASI:
       resultOutput = { success: true, count: todoList.length };
       await recordToolFinish(tc, resultOutput);
     } else if (name === 'write_file') {
-      const tc = await recordToolStart('write_file', `Menulis berkas: ${args.path}`, { path: args.path, bytes: args.content?.length || 0 });
+      const tc = await recordToolStart('write_file', `Menulis berkas: ${args.path}`, {
+        path: args.path,
+        content: args.content || '',
+        bytes: args.content?.length || 0
+      });
       resultOutput = await executeWriteFile(sessionId, args.path, args.content || '');
       if (args.path && !writtenFiles.includes(args.path)) writtenFiles.push(args.path);
       await recordToolFinish(tc, resultOutput);
@@ -261,7 +265,11 @@ ATURAN WAJIB UNTUK PERUBAHAN / ITERASI:
       resultOutput = await executeReadFile(sessionId, args.path);
       await recordToolFinish(tc, resultOutput);
     } else if (name === 'edit_file') {
-      const tc = await recordToolStart('edit_file', `Memperbaiki berkas: ${args.path}`, { path: args.path });
+      const tc = await recordToolStart('edit_file', `Memperbaiki berkas: ${args.path}`, {
+        path: args.path,
+        target_content: args.target_content,
+        replacement_content: args.replacement_content
+      });
       resultOutput = await executeEditFile(sessionId, args.path, args.target_content, args.replacement_content);
       await recordToolFinish(tc, resultOutput);
     } else if (name === 'bash') {

@@ -778,5 +778,36 @@ Pengguna mengirim tangkapan layar antarmuka yang menunjukkan pembuatan aplikasi 
      - Status Staf: Tautan LP hilang 100% (`display: none`), tab admin tersembunyi, badge staf tampil.
      - Seluruh pengujian lulus 100% terkonfirmasi visual via screenshot fisik.
 
+## 35. Sesi 31: Realisasi Transparansi Mendalam (Deep Transparency Layer) & Pembersihan Simbol Markdown
+- **Pertanyaan & Masukan Pengguna**:
+  1. *Pembersihan Simbol Mentah Markdown*: Simbol tanda bintang `**`, pagar `###`, dan kurung link masih muncul mentah di dalam teks balasan asisten chat.
+  2. *Audit Kedalaman Detail Tool Calls*: Mengapa kode di tombol `detail ▾` GudangKu pendek tidak seperti VibeCoder asli yang kodenya panjang hingga harus di-scroll berkali-kali ke bawah dan prosesnya memakan waktu 20-30 menit?
+  3. *Permintaan*: Buatkan seperti VibeCoder agar proses dan kodenya benar-benar transparan ke pengguna.
+- **Investigasi & Analisis**:
+  1. Teks balasan chat di `app/(dashboard)/c/[sessionId]/page.tsx` sebelumnya dirender menggunakan teks mentah `<p class="whitespace-pre-wrap">` tanpa parser markdown.
+  2. Saat sesi GudangKu dipulihkan ke Supabase, parameter tool call `write_file` hanya menyimpan ringkasan metadata `{ bytes: ... }` alih-alih seluruh teks mentah ratusan baris kodenya.
+  3. Engine `lib/agent/loop.ts` sebelumnya juga merekam `write_file` dengan `{ path, bytes }` sehingga detail live session tidak menyertakan teks kode penuh.
+- **Solusi & Implementasi**:
+  1. *Komponen `FormattedMessage` (Clean Zero-Dependency Markdown)*:
+     - Mengubah `**teks**` menjadi `<strong>` tebal putih bersih tanpa tanda bintang.
+     - Mengubah `### Judul` menjadi `<h3>` heading rapi tanpa tanda pagar.
+     - Mengubah `[Link](url)` menjadi tombol tautan biru interaktif dengan ikon `ExternalLink`.
+     - Mengubah `1.` dan `-` menjadi list bertitik/bernomor rapi.
+     - Mendukung rendering rekursif sehingga format tautan di dalam tulisan tebal tetap berfungsi sempurna.
+  2. *Komponen `ToolCallDetailBox` (Format VibeCoder Asli)*:
+     - `write_file`: Menampilkan header berkas, jumlah baris (misal `942 baris`), ukuran KB, tombol `Salin Kode`, dan kotak scrollable code block (`max-h-[460px]`).
+     - `bash`: Menampilkan `$ command`, terminal output stdout/stderr, dan exit code.
+     - `browser_test`: Menampilkan status pengujian DOM, target URL, dan verifikasi 0 console error.
+  3. *Penyuntikan Kode Fisik Penuh ke Supabase*:
+     - Seluruh berkas fisik asli (`public/index.html` 942 baris, `public/js/app.js` 751 baris, `server.js` 636 baris, data JSON) disuntikkan ke parameter `input.content` pada pesan asisten di tabel `chat_messages`.
+  4. *Standardisasi `lib/agent/loop.ts`*:
+     - Memastikan `write_file` dan `edit_file` selalu menyimpan parameter `content` utuh ke riwayat `toolCallsHistory` pada seluruh sesi baru di masa depan.
+  5. *Verifikasi Otomatis Headless Google Chrome (`verify_chat_transparency_ui.js`)*:
+     - Simbol `**` dan `###` terbukti 0 (hilang total).
+     - Link `[↗ Buka GudangKu Live App]` terbukti dirender sebagai elemen link interaktif.
+     - Tombol `detail ▾` pada `public/index.html` membuka kontainer kode 942 baris dengan scroll height 16.866 px yang dapat di-scroll mulus.
+     - Seluruh pengujian lulus 100% dan terkonfirmasi melalui screenshot fisik `transparency_clean_markdown.png` dan `transparency_html_detail_expanded.png`.
+
+
 
 
