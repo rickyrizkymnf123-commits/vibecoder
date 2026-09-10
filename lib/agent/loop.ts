@@ -357,10 +357,25 @@ ATURAN WAJIB UNTUK PERUBAHAN / ITERASI:
       resultOutput = await executeRunTests(sessionId, args.test_type);
       await recordToolFinish(tc, resultOutput, resultOutput.status === 'passed' ? 'completed' : 'failed');
     } else if (name === 'publish_app') {
-      if (writtenFiles.length < 3) {
+      const hasBrowserTest = toolCallsHistory.some((tc) => tc.tool === 'browser_test');
+      const hasTestsRun = toolCallsHistory.some((tc) => {
+        if (tc.tool === 'run_tests') return true;
+        if (tc.tool === 'bash') {
+          const cmd = typeof tc.input === 'object' && tc.input !== null && 'command' in tc.input ? String(tc.input.command) : String(tc.input || '');
+          return cmd.includes('test') || cmd.includes('--check');
+        }
+        return false;
+      });
+
+      if (writtenFiles.length < 5 || !hasBrowserTest || !hasTestsRun) {
+        const missingSteps: string[] = [];
+        if (writtenFiles.length < 5) missingSteps.push(`kelengkapan berkas modular (baru ${writtenFiles.length}/5 berkas wajib)`);
+        if (!hasTestsRun) missingSteps.push('eksekusi pengujian sintaks/skrip via bash atau run_tests');
+        if (!hasBrowserTest) missingSteps.push('verifikasi visual antarmuka via browser_test');
+
         resultOutput = {
           success: false,
-          error: `Aplikasi belum lengkap (baru ${writtenFiles.length} berkas dibuat). Harap selesaikan seluruh berkas modular di Fase 2, jalankan pengujian di Fase 3, dan verifikasi visual di Fase 4 sebelum memanggil publish_app.`
+          error: `Aplikasi belum memenuhi standar kualitas VibeCoder untuk diterbitkan. Masih ada langkah yang belum selesai: ${missingSteps.join(', ')}. Harap selesaikan seluruh berkas modular, pengujian sintaks/skrip, dan verifikasi visual headless browser sebelum memanggil publish_app.`
         };
         const tc = await recordToolStart('publish_app', `Validasi kelengkapan sebelum menerbitkan "${args.appName}"`, args);
         await recordToolFinish(tc, resultOutput, 'failed');
