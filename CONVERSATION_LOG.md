@@ -832,3 +832,15 @@ Pengguna mengirim tangkapan layar antarmuka yang menunjukkan pembuatan aplikasi 
   2. Menjalankan server Next.js melalui `npm run dev` pada port 3006 (`task-5670`).
   3. Server aktif dan siap (`Ready in 11.4s`).
   4. Pengujian HTTP request ke `http://localhost:3006` dan `http://localhost:3006/c/test-inv-1789023963513` menghasilkan status **200 OK**.
+
+## 39. Sesi 35: Transparansi Status 24 Aktivitas & Perbaikan Kondisi Status Exit Code
+- **Pertanyaan Pengguna**:
+  - Menanyakan apakah 24 aktivitas yang tampil itu real atau fake, dan apakah aplikasi lain hasilnya akan selalu 24 atau berbeda-beda (seperti di VibeCoder).
+  - Menyertakan tangkapan layar `node --check server.js` dengan teks `Exit code: 0 · Status: ⚠️ Gagal`.
+- **Penjelasan & Solusi**:
+  1. *Transparansi Murni*:
+     - Kodenya adalah berkas fisik nyata di folder workspace `test-inv-1789023963513`.
+     - Runtutan 24 langkah pada sesi ini adalah representasi contoh (mock snapshot) yang disuntikkan kemarin sesuai permintaan pengguna untuk melihat tampilan visual tanpa harus men-generate sesi baru.
+     - Setiap prompt atau aplikasi baru diproses secara otonom dinamis (bisa 15, 25, atau 50+ aktivitas tergantung kompleksitas dan loop auto-repair).
+  2. *Perbaikan Bug Exit Code*:
+     - Memperbaiki `ToolCallDetailBox` di `app/(dashboard)/c/[sessionId]/page.tsx` agar ketika `exitCode` tidak diset secara eksplisit tapi status tool tidak `failed`, sistem secara tepat menganggap exit code 0 (`✓ Sukses (0 error)`) dan menampilkan teks hijau.
