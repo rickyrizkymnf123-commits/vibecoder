@@ -823,3 +823,12 @@ Pengguna mengirim tangkapan layar antarmuka yang menunjukkan pembuatan aplikasi 
      - Berhasil memotret `verified_todo_strikethrough.png` yang menunjukkan 8 checklist tugas tercoret rapi dan 24 aktivitas dengan tombol `detail ▾`.
   4. *Penjadwalan Shutdown*:
      - Timer scheduled untuk pukul 02:00:00 WIB (1266 detik) via tool `schedule`. Seluruh pekerjaan tuntas sebelum jam 2.
+
+## 38. Sesi 34: Menjalankan Kembali Dev Server di Localhost Pasca-Restart
+- **Permintaan Pengguna**:
+  - *"jalankan di localhost"*
+- **Aksi & Verifikasi**:
+  1. Memeriksa ketersediaan port 3006 (kondisi port bersih/tidak ada bentrok).
+  2. Menjalankan server Next.js melalui `npm run dev` pada port 3006 (`task-5670`).
+  3. Server aktif dan siap (`Ready in 11.4s`).
+  4. Pengujian HTTP request ke `http://localhost:3006` dan `http://localhost:3006/c/test-inv-1789023963513` menghasilkan status **200 OK**.

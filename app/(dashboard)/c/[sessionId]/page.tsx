@@ -263,7 +263,7 @@ function ToolCallDetailBox({ call }: { call: ToolCallItem }) {
     const cmd = typeof call.input === 'object' && call.input?.command ? call.input.command : (typeof call.input === 'string' ? call.input : '');
     const stdout = typeof call.output === 'object' ? call.output?.stdout : (typeof call.output === 'string' ? call.output : '');
     const stderr = typeof call.output === 'object' ? call.output?.stderr : '';
-    const exitCode = typeof call.output === 'object' ? call.output?.exitCode : 0;
+    const exitCode = typeof call.output === 'object' && typeof call.output?.exitCode === 'number' ? call.output.exitCode : (call.status === 'failed' ? 1 : 0);
 
     return (
       <div className="space-y-2">
@@ -283,8 +283,10 @@ function ToolCallDetailBox({ call }: { call: ToolCallItem }) {
             </div>
           )}
           <div className="text-[10px] text-slate-500 pt-1 flex items-center gap-2 border-t border-slate-900">
-            <span>Exit code: {exitCode ?? 0}</span>
-            <span>· Status: {exitCode === 0 ? '✓ Sukses (0 error)' : '⚠️ Gagal'}</span>
+            <span>Exit code: {exitCode}</span>
+            <span className={exitCode === 0 ? 'text-emerald-400' : 'text-amber-400'}>
+              · Status: {exitCode === 0 ? '✓ Sukses (0 error)' : '⚠️ Gagal'}
+            </span>
           </div>
         </div>
       </div>
