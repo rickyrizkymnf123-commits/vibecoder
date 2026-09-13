@@ -844,3 +844,31 @@ Pengguna mengirim tangkapan layar antarmuka yang menunjukkan pembuatan aplikasi 
      - Setiap prompt atau aplikasi baru diproses secara otonom dinamis (bisa 15, 25, atau 50+ aktivitas tergantung kompleksitas dan loop auto-repair).
   2. *Perbaikan Bug Exit Code*:
      - Memperbaiki `ToolCallDetailBox` di `app/(dashboard)/c/[sessionId]/page.tsx` agar ketika `exitCode` tidak diset secara eksplisit tapi status tool tidak `failed`, sistem secara tepat menganggap exit code 0 (`✓ Sukses (0 error)`) dan menampilkan teks hijau.
+
+## 40. Sesi 36: Validasi Tarif Live KoboiLLM, Sistem 2 Token, & Fitur Top Up Kredit App (Ala VibeCoder)
+- **Konteks & Permintaan Pengguna**:
+  1. Validasi tarif token KoboiLLM langsung dari web resmi `https://www.koboillm.com/#ai-model`.
+  2. Klarifikasi sistem 2 token ala VibeCoder: 1 Kredit App (slot aplikasi) + 100.000 Kredit AI (buat prompt awal & revisi berulang kali). Hitungan modal API dan margin profit.
+  3. Konfirmasi bahwa di platform kita ("Kilat Tools") pengguna juga bisa melakukan top up berulang kali persis seperti di VibeCoder.
+- **Hasil Validasi Live KoboiLLM**:
+  - Di-scrape live via Puppeteer dari `https://www.koboillm.com/#ai-model`.
+  - Tarif resmi:
+    - `gemini-2.5-flash-lite`: \$0.10 input / \$0.40 output per 1M token (modal 100.000 token ≈ Rp 320–Rp 480).
+    - `gemini-2.5-flash`: \$0.30 input / \$2.50 output per 1M token (modal 100.000 token ≈ Rp 1.500–Rp 2.500).
+    - `gemini-3.7-flash`: \$1.50 input / \$7.50 output per 1M token (modal 100.000 token ≈ Rp 5.280).
+  - Menjual paket Rp 100.000 menghasilkan margin laba bersih 91%–96%.
+- **Implementasi & Perubahan Kode**:
+  1. *Default Register*:
+     - `app/api/auth/register/route.ts`: Pengguna baru otomatis menerima **1 Kredit App** dan **100.000 Kredit AI** (sebelumnya 50.000).
+  2. *Guardrail Pemotongan Kredit saat Revisi/Modifikasi*:
+     - `app/api/chat/stream/route.ts`: Memeriksa apakah sesi obrolan sudah pernah dideploy (`wasAlreadyDeployed`).
+     - Aplikasi Baru: Hanya memotong 1 Kredit App saat publish pertama.
+     - Revisi / Modifikasi Berulang: Jika aplikasi sudah pernah dideploy, Kredit App **TIDAK DIPOTONG LAGI** (meskipun saldo Kredit App 0, revisi tetap berjalan lancar). Revisi murni memotong saldo Kredit AI (token chat).
+  3. *Paket & Halaman Top Up Kredit App (`/billing`)*:
+     - `app/(dashboard)/billing/page.tsx`: Menyajikan kartu utama persis referensi VibeCoder:
+       - Judul: *Top Up Kredit App*
+       - Subtitle: *Rp100.000 = 1 slot app baru — plus 100.000 Kredit AI buat build & revisi.*
+       - Rincian Pesanan: Rp100.000 + Biaya Transaksi Rp10.000 = **Total Rp110.000**.
+       - Fitur: 1 app siap publish, 100.000 Kredit AI buat build & revisi, Tidak ada langganan atau kontrak bulanan. Sekali bayar, pakai kapan saja.
+       - Tombol: `[Bayar Sekarang]` (Midtrans Snap) dan `[⚡ Sandbox Top Up]` untuk dev testing.
+     - `app/api/payments/snap/route.ts` & `app/api/payments/webhook/route.ts`: Menyediakan paket `topup_app_100k` yang langsung menambahkan **+1 Slot App** dan **+100.000 Token AI** ke akun pengguna.

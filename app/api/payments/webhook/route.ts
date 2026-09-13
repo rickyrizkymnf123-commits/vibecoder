@@ -43,9 +43,9 @@ export async function POST(req: NextRequest) {
     if (isSuccess) {
       // Fulfill based on item_type
       if (payment.item_type === 'app_credit_bundle') {
-        // 1 App Credit + 50,000 AI Credits
+        // 1 App Credit + 100,000 AI Credits
         await addAppCredits(payment.user_id, 1, `midtrans_order_${orderId}`);
-        await addAiCredits(payment.user_id, 50000, `midtrans_order_${orderId}`);
+        await addAiCredits(payment.user_id, 100000, `midtrans_order_${orderId}`);
       } else if (payment.item_type === 'ai_credit_topup') {
         // 100,000 AI Credits
         await addAiCredits(payment.user_id, 100000, `midtrans_order_${orderId}`);

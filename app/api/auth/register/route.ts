@@ -32,8 +32,8 @@ export async function POST(req: NextRequest) {
         email: email.trim().toLowerCase(),
         username: cleanUsername,
         subdomain,
-        app_credits: 1, // Default 1 App publish credit slot
-        ai_credits: 50000, // Default 50,000 AI quota tokens
+        app_credits: 1, // 1 App publish credit slot (untuk 1 aplikasi web)
+        ai_credits: 100000, // 100.000 Kredit AI untuk chat, perancangan, dan revisi berkali-kali
         is_pro: false,
         pro_until: null
       },

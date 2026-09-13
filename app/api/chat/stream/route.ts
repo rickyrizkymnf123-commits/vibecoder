@@ -6,7 +6,8 @@ import {
   deductAppCredit,
   createChatMessage,
   saveApp,
-  updateChatSession
+  updateChatSession,
+  getChatSessionById
 } from '@/lib/supabase/db';
 import { runAgenticLoop } from '@/lib/agent/loop';
 import { estimateTokens, calculateAiCreditCost } from '@/lib/ai/token-counter';
@@ -86,7 +87,9 @@ export async function POST(req: NextRequest) {
     try {
       await updateChatSession(sessionId, { status: 'building' });
 
-      const hasAppCredit = (user.app_credits || 0) > 0;
+      const chatSession = await getChatSessionById(sessionId);
+      const wasAlreadyDeployed = Boolean(chatSession?.app_slug || chatSession?.status === 'deployed');
+      const hasAppCredit = wasAlreadyDeployed ? true : (user.app_credits || 0) > 0;
 
       const genResult = await runAgenticLoop({
         userPrompt: prompt,
@@ -119,8 +122,10 @@ export async function POST(req: NextRequest) {
         await saveApp(genResult.deployedApp);
 
         if (genResult.deployedApp.status === 'published') {
-          // Deduct 1 App Credit EXACTLY when publish succeeds
-          await deductAppCredit(user.id, `publish_app_${genResult.deployedApp.slug}`);
+          // Deduct 1 App Credit ONLY when publishing a brand new app for the first time
+          if (!wasAlreadyDeployed) {
+            await deductAppCredit(user.id, `publish_app_${genResult.deployedApp.slug}`);
+          }
           await updateChatSession(sessionId, {
             status: 'deployed',
             app_slug: genResult.deployedApp.slug

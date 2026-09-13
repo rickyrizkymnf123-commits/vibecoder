@@ -4,9 +4,14 @@ import { createPayment } from '@/lib/supabase/db';
 import { MidtransClient } from '@/lib/midtrans/client';
 
 const PACKAGES: Record<string, { name: string; price: number; type: 'app_credit_bundle' | 'ai_credit_topup' | 'pro_subscription' }> = {
+  topup_app_100k: {
+    name: 'Top Up Kredit App (1 Slot App + 100.000 Kredit AI)',
+    price: 110000,
+    type: 'app_credit_bundle'
+  },
   bundle_1: {
-    name: '1 Slot App + 50.000 Kredit AI',
-    price: 49000,
+    name: '1 Slot App + 100.000 Kredit AI',
+    price: 110000,
     type: 'app_credit_bundle'
   },
   ai_topup_100k: {

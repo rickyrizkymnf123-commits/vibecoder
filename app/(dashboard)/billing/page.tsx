@@ -189,57 +189,75 @@ export default function BillingPage() {
 
       {/* Packages Grid with Purple Palette (#6366f1 / #7c3aed) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
-        {/* Package 1: App Slot Bundle */}
-        <div className="p-6 rounded-2xl bg-slate-900/70 border border-slate-800 flex flex-col justify-between space-y-6 shadow-xl hover:border-violet-500/40 transition-colors">
-          <div>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-violet-600/15 border border-violet-500/30 text-violet-300 text-[10px] font-bold uppercase tracking-wider">
-              <span>Bundle Slot + AI</span>
+        {/* Package 1: Top Up Kredit App (Format Persis VibeCoder) */}
+        <div className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 flex flex-col justify-between space-y-5 shadow-2xl hover:border-violet-500/50 transition-all relative overflow-hidden">
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-xl font-extrabold text-white tracking-tight">Top Up Kredit App</h3>
+              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                Rp100.000 = 1 slot app baru — plus 100.000 Kredit AI buat build &amp; revisi.
+              </p>
             </div>
-            <div className="text-2xl sm:text-3xl font-black text-white mt-3">
-              Rp 49.000
+
+            {/* Inner Order Summary Card */}
+            <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800/90 space-y-3">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <span>📄</span>
+                <span>RINGKASAN PESANAN</span>
+              </div>
+              <div className="space-y-2 text-xs">
+                <div className="flex items-center justify-between text-slate-300">
+                  <span>Top Up Kredit App</span>
+                  <span className="font-semibold text-white">Rp100.000</span>
+                </div>
+                <div className="flex items-center justify-between text-slate-400">
+                  <span>Biaya Transaksi</span>
+                  <span className="font-mono text-slate-400">+Rp10.000</span>
+                </div>
+                <div className="pt-2 border-t border-slate-800/90 flex items-center justify-between">
+                  <span className="text-sm font-bold text-slate-200">Total</span>
+                  <span className="text-xl font-extrabold text-indigo-300 font-mono">Rp110.000</span>
+                </div>
+              </div>
             </div>
-            <p className="text-xs text-slate-400 mt-1">Pembayaran sekali via Midtrans Snap</p>
-            <div className="my-4 border-t border-slate-800" />
-            <ul className="space-y-2.5 text-xs text-slate-300">
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-[#6366f1] shrink-0" />
-                <span><b>+1 Slot Kredit App</b> (publish 1 app baru)</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-[#6366f1] shrink-0" />
-                <span><b>+50.000 Kredit AI</b> untuk iterasi</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-[#6366f1] shrink-0" />
-                <span>Database Postgres Supabase otomatis</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-[#6366f1] shrink-0" />
-                <span>Live Interactive Preview URL aktif</span>
-              </li>
-            </ul>
+
+            <div className="space-y-2 text-xs text-slate-300 pt-1">
+              <p className="text-slate-400 font-medium text-[11px]">Sekali bayar, bukan langganan.</p>
+              <ul className="space-y-2 text-xs">
+                <li className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-400 shrink-0" strokeWidth={2.5} />
+                  <span>1 app siap publish</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-400 shrink-0" strokeWidth={2.5} />
+                  <span>100.000 Kredit AI buat build &amp; revisi</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-400 shrink-0" strokeWidth={2.5} />
+                  <span>Tidak ada langganan atau kontrak bulanan</span>
+                </li>
+              </ul>
+            </div>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 pt-2">
             <button
-              onClick={() => handleBuy('bundle_1')}
-              disabled={purchasing === 'bundle_1'}
-              className="w-full py-2.5 sm:py-3 rounded-xl bg-[#6366f1] hover:bg-[#4f46e5] text-white font-semibold text-xs transition-colors flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 disabled:opacity-50"
+              onClick={() => handleBuy('topup_app_100k')}
+              disabled={purchasing === 'topup_app_100k'}
+              className="w-full py-3.5 rounded-2xl bg-[#7c3aed] hover:bg-[#6d28d9] text-white font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-purple-600/30 disabled:opacity-50 active:scale-[0.98]"
             >
-              {purchasing === 'bundle_1' ? (
+              {purchasing === 'topup_app_100k' ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                <>
-                  <CreditCard className="w-3.5 h-3.5" /> Beli Bundle Slot
-                </>
+                'Bayar Sekarang'
               )}
             </button>
             <button
-              onClick={() => handleSimulateWebhook('app_credit_bundle', 49000)}
+              onClick={() => handleSimulateWebhook('app_credit_bundle', 110000)}
               disabled={simulatingWebhook}
-              className="w-full py-1.5 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-[10px] text-slate-400 transition-colors"
+              className="w-full py-1.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-[10px] text-slate-400 transition-colors"
             >
-              ⚡ Instant Sandbox Top-up
+              ⚡ Instant Sandbox Top-up (Dev Mode)
             </button>
           </div>
         </div>

@@ -27,14 +27,19 @@
   - Mata uang: Integer cents (contoh: Rp 150.000 disimpan sebagai 15000000) untuk menghilangkan galat pembulatan floating-point
 - Admin Guard: Mencegah penghapusan atau demosi akun admin terakhir
 
-## 3. Sistem Kredit & Payment Gateway
-- Kredit App: Slot publish aplikasi. Tepat berkurang 1 saat deployment Vercel berstatus `READY`. Jika saldo 0, aplikasi disimpan dalam status `draft` dan menunda live publish sampai user melakukan top-up.
-- Kredit AI: Kuota token (50.000 awal, berkurang seiring proses chat / eksekusi tool proporsional terhadap token).
+## 3. Sistem Kredit & Payment Gateway (Model 2 Token VibeCoder)
+- **Kredit App**: Slot publish aplikasi siap pakai. Berkurang tepat 1 hanya saat deploy pertama aplikasi baru. Untuk revisi/modifikasi berulang pada aplikasi yang sudah dideploy (`wasAlreadyDeployed`), Kredit App **TIDAK DIPOTONG LAGI** (meski saldo 0, revisi tetap jalan).
+- **Kredit AI**: Saldo token chat (bawaan pendaftaran 100.000 token). Berkurang seiring interaksi prompt awal, revisi, generate kode, dan loop perbaikan.
+- **Top Up Kredit App (Ala VibeCoder)**:
+  - Harga: Rp 100.000 + Biaya Transaksi Rp 10.000 = **Total Rp 110.000**.
+  - Benefit didapat: **+1 Slot App Baru** + **+100.000 Kredit AI** buat build & revisi.
+  - Sifat: Sekali bayar, bukan langganan bulanan, saldo terakumulasi (numpuk terus) tanpa masa kedaluwarsa.
 - Payment Gateway: Midtrans Snap Sandbox dengan verifikasi webhook SHA-512 signature `SHA512(order_id + status_code + gross_amount + ServerKey)`.
 - Paket Tersedia:
-  1. `bundle_1`: 1 Slot App + 50.000 Kredit AI (Rp 49.000)
-  2. `ai_topup_100k`: 100.000 Kredit AI (Rp 25.000)
-  3. `pro_monthly`: 30 hari Pro + 5 Slot App + 250.000 Kredit AI (Rp 149.000)
+  1. `topup_app_100k` (Paket Utama): Rp 110.000 -> 1 Slot App + 100.000 Kredit AI
+  2. `bundle_1`: 1 Slot App + 50.000 Kredit AI (Rp 49.000)
+  3. `ai_topup_100k`: 100.000 Kredit AI (Rp 25.000)
+  4. `pro_monthly`: 30 hari Pro + 5 Slot App + 250.000 Kredit AI (Rp 149.000)
 
 ## 4. Fitur Tier Pro & Guard Status Draft
 - Download Source Code (.ZIP) via `jszip` (khusus app `published`)
