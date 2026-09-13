@@ -359,3 +359,14 @@
   - Sisi Kanan (Live App): Aplikasi Kasir POS & Inventori Stok Sembako interaktif (bisa klik produk, tambah keranjang kasir, hitung subtotal & PPN 11% dinamis, modal cetak struk thermal).
   - Input Chat Demo: Bersifat read-only interaktif; saat diklik atau disubmit, memunculkan modal ajakan pendaftaran akun / login gratis dan mencegah AI generation liar tanpa akun.
   - Generative UI Artifact: File mandiri `live_demo_widget.html` tersimpan di artifacts directory.
+
+### 15. Fitur App Chooser Modal saat Tombol Domain Diklik (Ala VibeCoder)
+- **Perilaku Tombol Domain di Topbar**:
+  - Tombol subdomain (`{username}.kilattools.dev LIVE APP`) tidak langsung melompat ke 1 aplikasi acak.
+  - Mengklik tombol domain membuka dialog popover/modal: **"Mau Cek Aplikasi yang Mana?"**.
+  - Modal menyajikan daftar seluruh aplikasi aktif yang dimiliki pengguna:
+    - Nama aplikasi, badge status `● LIVE APP`, URL domain/path preview.
+    - Tombol `[Buka App ↗]` untuk membuka live app di tab baru.
+    - Tombol `[Studio 💬]` untuk langsung menuju ruang percakapan AI tempat aplikasi tersebut dibuat.
+    - Tautan cepat `🌐 Kelola Custom Domain`.
+  - Jika belum ada aplikasi terbit, menyajikan ajakan ramah `[+ Buat Aplikasi Pertama Anda]`.

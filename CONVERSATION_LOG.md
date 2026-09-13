@@ -960,3 +960,24 @@ Pengguna mengirim tangkapan layar antarmuka yang menunjukkan pembuatan aplikasi 
     - Saat sesi diklik, riwayat obrolan lengkap dengan seluruh aktivitas ReAct dan checklist 100% selesai langsung terbuka secara instan.
     - Tangkapan layar tersimpan di `admin_dashboard_with_sessions.png` dan `admin_session_gudangku.png`.
 
+## 44. Sesi 40: Implementasi Modal Pilihan Aplikasi (App Chooser Modal) saat Tombol Domain Diklik (Ala VibeCoder)
+- **Permintaan Pengguna**:
+  - Di VibeCoder, kalau tombol domain diklik tidak langsung diarahkan ke 1 aplikasi sembarangan, melainkan dimunculkan pilihan: *"kamu mau cek aplikasi mana?"*.
+- **Implementasi & Perubahan Kode**:
+  1. *State & Komponen di Layout Dashboard (`app/(dashboard)/layout.tsx`)*:
+     - Menyimpan daftar seluruh aplikasi yang dimiliki user (`userApps: GeneratedApp[]`).
+     - Mengubah tombol domain pill di topbar (`{subdomain}.kilattools.dev LIVE APP`) dan tombol mobile `Live App` dari tautan langsung (`<a>`) menjadi pemantik modal (`<button onClick={() => setShowAppChooserModal(true)}>`).
+     - Menghadirkan Modal Dialog Interaktif:
+       - Header: Subdomain pengguna dan judul *"Mau Cek Aplikasi yang Mana?"*.
+       - Daftar Aplikasi: Setiap aplikasi menampilkan nama, badge `● LIVE APP`, URL domain/path preview (`{subdomain}.kilattools.dev/{slug}`), tombol `[Buka App ↗]` ke live preview, dan tombol `[Studio 💬]` ke sesi obrolan AI proyek tersebut.
+       - Tautan cepat `🌐 Kelola Custom Domain` dan tombol `[Tutup]`.
+  2. *Sinkronisasi Data Aplikasi*:
+     - Memastikan tabel `apps` di Supabase terisi kedua aplikasi aktif (`GudangKu Enterprise` dan `Toko Berkah — POS Kasir`) untuk `user-superadmin-ricky`.
+- **Verifikasi**:
+  - `npx tsc --noEmit`: 0 error.
+  - Pengujian headless browser (`test_app_chooser_modal.js`):
+    - Login sebagai `rickyrizkymnf123@gmail.com`.
+    - Klik tombol domain pill di topbar.
+    - Modal *"Mau Cek Aplikasi yang Mana?"* muncul secara mulus menampilkan daftar kedua aplikasi lengkap dengan tombol aksi Buka App dan Studio.
+    - Tangkapan layar tersimpan di `domain_app_chooser_modal.png`.
+

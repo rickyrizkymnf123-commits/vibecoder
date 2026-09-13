@@ -23,7 +23,7 @@ import {
   Zap,
   ShieldCheck
 } from 'lucide-react';
-import { UserProfile, ChatSession } from '@/lib/types';
+import { UserProfile, ChatSession, GeneratedApp } from '@/lib/types';
 import { KilatLogo } from '@/components/KilatLogo';
 
 function formatRelativeTime(dateStr?: string) {
@@ -53,6 +53,8 @@ export default function DashboardLayout({
   const [isConfirmingDeleteAll, setIsConfirmingDeleteAll] = useState(false);
   const [isBuilding, setIsBuilding] = useState(false);
   const [latestApp, setLatestApp] = useState<{ id?: string; name: string; slug: string } | null>(null);
+  const [userApps, setUserApps] = useState<GeneratedApp[]>([]);
+  const [showAppChooserModal, setShowAppChooserModal] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
 
@@ -62,7 +64,10 @@ export default function DashboardLayout({
       if (res.ok) {
         const data = await res.json();
         if (data.apps && data.apps.length > 0) {
+          setUserApps(data.apps);
           setLatestApp(data.apps[0]);
+        } else {
+          setUserApps([]);
         }
       }
     } catch {}
@@ -436,22 +441,21 @@ export default function DashboardLayout({
 
           {/* Center: Live App Preview & Resource Badges (Prominently in the middle) */}
           <div className="hidden md:flex items-center gap-3">
-            {/* Live App Preview Pill */}
-            <a
-              href={latestApp ? `/preview/${latestApp.slug}` : `/preview/gudangku-inventori-stok`}
-              target="_blank"
-              rel="noreferrer"
-              title={latestApp ? `Buka Live Preview: ${latestApp.name}` : 'Buka Live Preview Aplikasi'}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 hover:border-amber-500/50 text-slate-200 hover:text-white transition-all shadow-sm group font-mono text-[11px]"
+            {/* Live App Preview Pill -> Klik memunculkan modal pemilih aplikasi ala VibeCoder */}
+            <button
+              type="button"
+              onClick={() => setShowAppChooserModal(true)}
+              title="Pilih dan Cek Aplikasi Live Anda"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 hover:border-violet-500/50 text-slate-200 hover:text-white transition-all shadow-sm group font-mono text-[11px] cursor-pointer"
             >
               <Zap className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
               <span className="font-semibold text-slate-200 group-hover:text-amber-300">
-                {latestApp ? `${latestApp.slug}.kilattools.dev` : `${user?.subdomain || 'demo'}.kilattools.dev`}
+                {user?.subdomain || user?.username || 'demo'}.kilattools.dev
               </span>
               <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-sans uppercase font-bold tracking-wider">
-                LIVE APP
+                LIVE APP {userApps.length > 0 ? `(${userApps.length})` : ''}
               </span>
-            </a>
+            </button>
 
             {/* Combined Resource Badges */}
             <div className="flex items-center bg-slate-900/90 border border-slate-800/80 rounded-xl p-0.5 shadow-inner">
@@ -480,15 +484,14 @@ export default function DashboardLayout({
           {/* Right: Quick Nav & Actions (Comfortably spaced on the right) */}
           <div className="flex items-center gap-2 sm:gap-2.5 ml-auto md:ml-0 text-xs font-medium shrink-0">
             {/* Mobile Fallback for App Pill */}
-            <a
-              href={latestApp ? `/preview/${latestApp.slug}` : `/preview/gudangku-inventori-stok`}
-              target="_blank"
-              rel="noreferrer"
+            <button
+              type="button"
+              onClick={() => setShowAppChooserModal(true)}
               className="md:hidden flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-[11px] font-mono text-slate-200"
             >
               <Zap className="w-3 h-3 text-amber-400" />
-              <span>Live App</span>
-            </a>
+              <span>Live App {userApps.length > 0 ? `(${userApps.length})` : ''}</span>
+            </button>
 
             <Link
               href="/domains"
@@ -575,6 +578,123 @@ export default function DashboardLayout({
         <div className="flex-1 overflow-y-auto flex flex-col">
           {children}
         </div>
+
+        {/* ========================================================================= */}
+        {/* MODAL PEMILIH APLIKASI (Ala VibeCoder: "Mau cek aplikasi yang mana?") */}
+        {/* ========================================================================= */}
+        {showAppChooserModal && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
+            <div className="bg-[#0f172a] border border-slate-800 rounded-2xl w-full max-w-xl overflow-hidden shadow-2xl space-y-4">
+              {/* Modal Header */}
+              <div className="p-4 sm:p-5 bg-slate-950/90 border-b border-slate-800 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-violet-600/20 border border-violet-500/30 flex items-center justify-center text-violet-400">
+                    <Globe className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-bold text-white">
+                      Mau Cek Aplikasi yang Mana?
+                    </h3>
+                    <p className="text-xs text-slate-400 font-mono mt-0.5">
+                      Domain: <span className="text-amber-400 font-semibold">{user?.subdomain || user?.username || 'demo'}.kilattools.dev</span>
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowAppChooserModal(false)}
+                  className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* App List Container */}
+              <div className="p-4 sm:p-5 max-h-[420px] overflow-y-auto space-y-2.5 scrollbar-thin scrollbar-thumb-slate-800">
+                {userApps.length === 0 ? (
+                  <div className="text-center py-8 space-y-3">
+                    <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center mx-auto text-slate-500">
+                      <FolderOpen className="w-6 h-6" />
+                    </div>
+                    <div className="text-xs text-slate-400">
+                      Belum ada aplikasi yang diterbitkan di akun ini.
+                    </div>
+                    <button
+                      onClick={() => {
+                        setShowAppChooserModal(false);
+                        createNewSession();
+                      }}
+                      className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold transition-all shadow-md shadow-violet-600/20"
+                    >
+                      + Buat Aplikasi Pertama Anda
+                    </button>
+                  </div>
+                ) : (
+                  userApps.map((app) => (
+                    <div
+                      key={app.id}
+                      className="p-3.5 rounded-xl bg-slate-900/90 hover:bg-slate-800/80 border border-slate-800/90 hover:border-slate-700 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 group"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                          <h4 className="text-xs sm:text-sm font-semibold text-slate-100 group-hover:text-violet-300 transition-colors truncate">
+                            {app.name}
+                          </h4>
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-950 border border-emerald-800 text-emerald-400 shrink-0">
+                            LIVE
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 font-mono mt-1 truncate">
+                          URL: <span className="text-indigo-300">{user?.subdomain || user?.username || 'app'}.kilattools.dev/{app.slug}</span>
+                        </p>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-800">
+                        <a
+                          href={`/preview/${app.slug}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={() => setShowAppChooserModal(false)}
+                          className="flex-1 sm:flex-none px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm"
+                        >
+                          <span>Buka App</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                        {app.session_id && (
+                          <Link
+                            href={`/c/${app.session_id}`}
+                            onClick={() => setShowAppChooserModal(false)}
+                            className="flex-1 sm:flex-none px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-medium transition-colors flex items-center justify-center gap-1 border border-slate-700"
+                          >
+                            <span>Studio</span>
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-4 bg-slate-950/90 border-t border-slate-800 flex items-center justify-between text-xs">
+                <Link
+                  href="/domains"
+                  onClick={() => setShowAppChooserModal(false)}
+                  className="text-violet-400 hover:text-violet-300 font-medium transition-colors flex items-center gap-1"
+                >
+                  <span>🌐 Kelola Custom Domain</span>
+                </Link>
+                <button
+                  onClick={() => setShowAppChooserModal(false)}
+                  className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors"
+                >
+                  Tutup
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
