@@ -872,3 +872,6 @@ Pengguna mengirim tangkapan layar antarmuka yang menunjukkan pembuatan aplikasi 
        - Fitur: 1 app siap publish, 100.000 Kredit AI buat build & revisi, Tidak ada langganan atau kontrak bulanan. Sekali bayar, pakai kapan saja.
        - Tombol: `[Bayar Sekarang]` (Midtrans Snap) dan `[⚡ Sandbox Top Up]` untuk dev testing.
      - `app/api/payments/snap/route.ts` & `app/api/payments/webhook/route.ts`: Menyediakan paket `topup_app_100k` yang langsung menambahkan **+1 Slot App** dan **+100.000 Token AI** ke akun pengguna.
+  4. *Fix Runtime Error `ReferenceError: Check is not defined`*:
+     - Menambahkan impor komponen ikon `Check` dari `lucide-react` pada [app/(dashboard)/billing/page.tsx](file:///C:/Users/UC/.gemini/antigravity/scratch/vibecoder/app/(dashboard)/billing/page.tsx).
+     - Verifikasi live headless browser: halaman `/billing` render 100% normal tanpa runtime error.
