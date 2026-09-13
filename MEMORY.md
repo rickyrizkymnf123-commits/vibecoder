@@ -70,9 +70,9 @@
   - 6 Tabel PostgreSQL termigrasi: `profiles`, `chat_sessions`, `chat_messages`, `apps`, `credit_transactions`, `payments`
   - Koneksi live `@supabase/supabase-js` terverifikasi 100%
 - Vercel Live Deployment:
-  - Production Alias: `https://vibecoder-forge.vercel.app` (HTTP 200 OK)
-  - Deployment URL: `https://vibecoder-forge-jrsq7d361-rickyrizkymnf123-7003s-projects.vercel.app`
-  - Dashboard Proyek: `https://vercel.com/rickyrizkymnf123-7003s-projects/vibecoder-forge`
+  - Production Alias: `https://forge-app-engine.vercel.app` (HTTP 200 OK)
+  - Deployment URL: `https://forge-qnmgmqkrd-rickyrizkymnf123-7003s-projects.vercel.app`
+  - Dashboard Proyek: `https://vercel.com/rickyrizkymnf123-7003s-projects/forge`
   - 10 Environment Variables produksi terpasang dan tersinkronisasi
 - GitHub Live:
   - Akun: `rickyrizkymnf123-commits`
