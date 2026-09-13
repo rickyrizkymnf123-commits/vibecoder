@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import LandingLiveDemoStudio from '@/components/LandingLiveDemoStudio';
 import {
   Sparkles,
   Zap,
@@ -90,65 +91,8 @@ export default function LandingPage() {
           </a>
         </div>
 
-        {/* Live Chat Mockup Preview */}
-        <div className="mt-16 text-left rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur-xl shadow-2xl p-6 sm:p-8">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-6">
-            <div className="flex items-center gap-3">
-              <div className="flex gap-1.5">
-                <div className="w-3 h-3 rounded-full bg-rose-500/80" />
-                <div className="w-3 h-3 rounded-full bg-amber-500/80" />
-                <div className="w-3 h-3 rounded-full bg-emerald-500/80" />
-              </div>
-              <span className="text-xs text-slate-400 font-mono"><span className="text-violet-400 font-semibold">[Contoh Simulasi AI]</span> session: kasir-pos-sembako</span>
-            </div>
-            <span className="text-xs font-mono text-emerald-400 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              Published to Vercel (Ready)
-            </span>
-          </div>
-
-          <div className="space-y-4">
-            {/* User message */}
-            <div className="bg-slate-800/60 rounded-xl p-4 border border-slate-700/60 text-sm">
-              <span className="text-xs font-semibold text-violet-400 uppercase tracking-wider block mb-1">Pengguna</span>
-              "Buatkan aplikasi kasir POS dan stok toko sembako. Harus ada role admin dan kasir, cetak struk, kalkulasi nominal rupiah presisi, dan zona waktu WIB."
-            </div>
-
-            {/* AI message */}
-            <div className="bg-slate-950/70 rounded-xl p-5 border border-violet-500/30 text-sm space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-fuchsia-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5" /> Forge AI Engine
-                </span>
-                <span className="text-xs font-mono text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800">
-                  16/16 Test Passed (100%)
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                <div className="p-3 bg-slate-900 rounded-lg border border-slate-800 flex items-center justify-between">
-                  <span className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                    <span>lib/util.ts (Asia/Jakarta + Rupiah cents)</span>
-                  </span>
-                  <span className="text-slate-400 font-mono">OK</span>
-                </div>
-                <div className="p-3 bg-slate-900 rounded-lg border border-slate-800 flex items-center justify-between">
-                  <span className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                    <span>lib/auth.ts (scryptSync + CSRF Token)</span>
-                  </span>
-                  <span className="text-slate-400 font-mono">OK</span>
-                </div>
-              </div>
-
-              <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs flex items-center justify-between">
-                <span>URL Publik: <b>https://demo.forge.dev/pos-sembako</b></span>
-                <span className="text-emerald-400 font-bold">LIVE &bull; 1 Kredit App Terpakai</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* 1:1 Live Interactive AI Studio & App Demo */}
+        <LandingLiveDemoStudio />
       </section>
 
       {/* Features Grid */}

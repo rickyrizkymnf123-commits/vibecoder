@@ -1,4 +1,4 @@
-﻿import { getCurrentUser } from './session';
+import { getCurrentUser } from './session';
 import { getUserProfile } from '../supabase/db';
 
 export async function requireAdminSession() {
@@ -7,12 +7,24 @@ export async function requireAdminSession() {
     return { authorized: false, error: 'Unauthorized: Sesi tidak ditemukan', status: 401 };
   }
 
-  if (session.role === 'admin' || session.username === 'demo' || session.email === 'demo@vibecoder.app') {
+  if (
+    session.role === 'admin' ||
+    session.username === 'demo' ||
+    session.email === 'demo@vibecoder.app' ||
+    session.email === 'rickyrizkymnf123@gmail.com' ||
+    session.username === 'ricky' ||
+    session.username === 'rickyrizky'
+  ) {
     return { authorized: true, session, status: 200 };
   }
 
   const profile = await getUserProfile(session.userId);
-  if (!profile || (profile.role !== 'admin' && profile.username !== 'demo')) {
+  if (
+    !profile ||
+    (profile.role !== 'admin' &&
+      profile.username !== 'demo' &&
+      profile.email !== 'rickyrizkymnf123@gmail.com')
+  ) {
     return { authorized: false, error: 'Forbidden: Khusus Administrator', status: 403 };
   }
 

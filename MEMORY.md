@@ -344,3 +344,18 @@
   - Tab 4: Pengaturan Live API KoboiLLM (Base URL, API Key, Model Default, dan Uji Koneksi latency).
 - **Penyesuaian Tier Pro Add-On**: Rp 100.000 / 30 hari (Custom Domain, Storage 10GB, Export ZIP/SQL, Push GitHub).
 - **Efisiensi Token AI Engine**: Revisi diwajibkan menggunakan targeted patching `edit_file` guna mencegah full-file rewrite dan menghemat hingga 90% kredit token.
+
+### 14. Super Admin Ricky & Live Demo 1:1 Landing Page
+- **Pembersihan Akun Demo di Publik**:
+  - Halaman login (`app/(auth)/login/page.tsx`) telah dibersihkan dari seluruh kredensial demo (`demo / password123`). Placeholder diubah menjadi generic `username atau email anda`.
+- **Akun Super Admin Resmi**:
+  - Email: `rickyrizkymnf123@gmail.com`
+  - Password: `Permatasari11` (tersimpan aman ter-hash `scryptSync`)
+  - Status: `role: 'admin'`, `is_approved: true`, `is_pro: true`, `app_credits: 999`, `ai_credits: 9999999`.
+  - Guardrail backend `lib/auth/admin-guard.ts` dan `lib/supabase/db.ts` memvalidasi email ini sebagai Super Admin berhak penuh.
+- **Live Demo 1:1 di Landing Page (`components/LandingLiveDemoStudio.tsx`)**:
+  - Menghadirkan antarmuka 1:1 persis Studio Obrolan AI dan Interactive App Preview.
+  - Sisi Kiri (AI Studio): Checklist 8/8 Todo dicoret hijau, 4 tool execution pills dengan tombol `detail ▾` yang bisa diklik untuk inspeksi kode SQL, React, terminal log, dan DOM audit.
+  - Sisi Kanan (Live App): Aplikasi Kasir POS & Inventori Stok Sembako interaktif (bisa klik produk, tambah keranjang kasir, hitung subtotal & PPN 11% dinamis, modal cetak struk thermal).
+  - Input Chat Demo: Bersifat read-only interaktif; saat diklik atau disubmit, memunculkan modal ajakan pendaftaran akun / login gratis dan mencegah AI generation liar tanpa akun.
+  - Generative UI Artifact: File mandiri `live_demo_widget.html` tersimpan di artifacts directory.

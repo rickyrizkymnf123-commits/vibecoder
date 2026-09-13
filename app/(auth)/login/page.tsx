@@ -75,7 +75,7 @@ export default function PlatformLoginPage() {
               type="text"
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
-              placeholder="demo atau demo@forge.dev"
+              placeholder="username atau email anda"
               className="w-full px-3.5 py-2.5 bg-slate-950/60 border border-slate-700/80 rounded-xl text-white text-sm focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-colors placeholder:text-slate-600"
               required
             />
@@ -95,10 +95,6 @@ export default function PlatformLoginPage() {
               className="w-full px-3.5 py-2.5 bg-slate-950/60 border border-slate-700/80 rounded-xl text-white text-sm focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-colors placeholder:text-slate-600"
               required
             />
-          </div>
-
-          <div className="text-xs text-slate-500">
-            Akun bawaan demo: <b>demo</b> / <b>password123</b>
           </div>
 
           <button

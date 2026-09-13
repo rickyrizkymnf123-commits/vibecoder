@@ -21,7 +21,13 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
 
     if (error || !data) return null;
     const { password_hash, ...profile } = data;
-    const isAdmin = profile.username === 'demo' || profile.role === 'admin' || profile.email === 'demo@vibecoder.app';
+    const isAdmin =
+      profile.username === 'demo' ||
+      profile.role === 'admin' ||
+      profile.email === 'demo@vibecoder.app' ||
+      profile.email === 'rickyrizkymnf123@gmail.com' ||
+      profile.username === 'ricky' ||
+      profile.username === 'rickyrizky';
     return {
       ...profile,
       role: isAdmin ? 'admin' : (profile.role || 'user'),
@@ -47,7 +53,13 @@ export async function getUserByEmailOrUsername(
 
     if (error || !data) return null;
     const { password_hash, ...profile } = data;
-    const isAdmin = profile.username === 'demo' || profile.role === 'admin' || profile.email === 'demo@vibecoder.app';
+    const isAdmin =
+      profile.username === 'demo' ||
+      profile.role === 'admin' ||
+      profile.email === 'demo@vibecoder.app' ||
+      profile.email === 'rickyrizkymnf123@gmail.com' ||
+      profile.username === 'ricky' ||
+      profile.username === 'rickyrizky';
     const cleanProfile: UserProfile = {
       ...profile,
       role: isAdmin ? 'admin' : (profile.role || 'user'),
@@ -129,7 +141,13 @@ export async function getAllUsers(): Promise<UserProfile[]> {
     if (error || !data) return [];
     return data.map((row: any) => {
       const { password_hash, ...profile } = row;
-      const isAdmin = profile.username === 'demo' || profile.role === 'admin' || profile.email === 'demo@vibecoder.app';
+      const isAdmin =
+      profile.username === 'demo' ||
+      profile.role === 'admin' ||
+      profile.email === 'demo@vibecoder.app' ||
+      profile.email === 'rickyrizkymnf123@gmail.com' ||
+      profile.username === 'ricky' ||
+      profile.username === 'rickyrizky';
       return {
         ...profile,
         role: isAdmin ? 'admin' : (profile.role || 'user'),

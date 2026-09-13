@@ -1,6 +1,22 @@
 {
   "profiles": [
     {
+      "id": "user-superadmin-ricky",
+      "email": "rickyrizkymnf123@gmail.com",
+      "username": "rickyrizky",
+      "subdomain": "rickyrizky",
+      "app_credits": 999,
+      "ai_credits": 9999999,
+      "is_pro": true,
+      "pro_until": "2099-01-01T00:00:00Z",
+      "role": "admin",
+      "status": "active",
+      "is_approved": true,
+      "passwordHash": "2fec6d6bbe2e91010cb97b02455fc48a:ef72381c696fa0304cfe020385ce5bdca0d3516d2392acda9f367ed6c5d9985cbccae1a70f0c220c60f518b27882ef64fba9611ce74120e1cd9d43b5dcd702db",
+      "created_at": "2026-09-13T11:50:42.058Z",
+      "updated_at": "2026-09-13T11:50:42.058Z"
+    },
+    {
       "id": "user-demo-1",
       "email": "demo@vibecoder.app",
       "username": "demo",

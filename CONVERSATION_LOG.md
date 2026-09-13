@@ -906,8 +906,42 @@ Pengguna mengirim tangkapan layar antarmuka yang menunjukkan pembuatan aplikasi 
      - `lib/agent/loop.ts`: Mempertegas instruksi prompt agar agen wajib memakai `edit_file` saat melakukan iterasi/revisi parsial.
   6. *Integrasi Kredensial Baru*:
      - Memperbarui `VERCEL_TOKEN`, `GITHUB_PAT`, dan `SUPABASE_ACCESS_TOKEN` di `.env.local`.
+## 42. Sesi 38: Pembersihan Akun Demo Publik, Konfigurasi Super Admin Ricky, & Live Demo Interaktif 1:1 di Landing Page
+- **Permintaan Pengguna**:
+  1. Hapus informasi / teks akun demo (`demo / password123`) di halaman login publik agar tidak membocorkan kredensial.
+  2. Jadikan akun `rickyrizkymnf123@gmail.com` dengan kata sandi `Permatasari11` sebagai Super Admin resmi.
+  3. Buat Live Demo 1:1 dari Studio Pembuatan Aplikasi kita di Landing Page (`/`):
+     - Menampilkan tampilan 1:1 persis antarmuka obrolan studio AI.
+     - Checklist Todo hijau (100% Selesai) yang dicoret.
+     - Deretan aktivitas ReAct (Tools) dengan tombol `detail ▾` yang bisa diklik untuk membuka kode sumber & log terminal.
+     - Pratinjau interaktif aplikasi kasir POS & stok sembako yang bisa diklik-klik (tambah keranjang, hitung total rupiah, dan cetak struk thermal nyata).
+     - Pembatasan: Input chat demo hanya bisa diklik (memunculkan modal ajakan pendaftaran akun / login gratis), tidak bisa trigger / generate AI baru tanpa akun.
+- **Implementasi & Perubahan Kode**:
+  1. *Pembersihan Akun Demo di Login*:
+     - `app/(auth)/login/page.tsx`: Menghapus teks petunjuk akun demo bawaan dan mengganti placeholder menjadi `username atau email anda`.
+  2. *Super Admin Resmi*:
+     - PostgreSQL Supabase (`profiles`): Menambahkan record akun `user-superadmin-ricky` (`rickyrizkymnf123@gmail.com`, username `rickyrizky`, kata sandi ter-hash `Permatasari11`, `role: 'admin'`, `is_approved: true`, `is_pro: true`, `app_credits: 999`, `ai_credits: 9999999`).
+     - Sinkronisasi store lokal `data/vibecoder_store.json`.
+     - Guardrail backend: `lib/auth/admin-guard.ts` dan `lib/supabase/db.ts` memvalidasi email `rickyrizkymnf123@gmail.com` sebagai admin resmi.
+  3. *Komponen Live Demo 1:1 (`components/LandingLiveDemoStudio.tsx`)*:
+     - Header Studio: Nama sesi `ses-kasir-berkah / POS & Stok Toko Kelontong`, status `● LIVE PROD`, tombol switcher tab (`AI Studio`, `Live App`, `Split Screen (1:1)`).
+     - Sisi Kiri (Chat Studio):
+       - Prompt pengguna riil.
+       - Kartu respon asisten dengan badge *Mode AI Riil (Live Autonomous ReAct Engine)* dan *12/12 Test Passed*.
+       - Daftar checklist 8 Todo yang dicoret hijau (`line-through`).
+       - 4 tool execution pills (`write_file`, `bash`, `browser_test`, `publish_app`) dengan tombol `detail ▾` yang dapat di-toggle untuk menginspeksi kode SQL/React dan log terminal eksekusi.
+       - Floating chat input bar (Demo Mode): Saat diklik atau disubmit, membuka modal ramah ajakan daftar akun / login dan mencegah pembuatan AI tanpa akun.
+     - Sisi Kanan (Live App Preview):
+       - Mini browser bar: `https://berkah-mart.vibecoder.co.id` SSL 256-bit.
+       - Tab Kasir POS: Katalog sembako, pencarian, filter kategori, penambahan ke keranjang, kalkulasi PPN 11%, dan tombol `[Bayar & Cetak Struk]`.
+       - Modal Struk Thermal Belanja: Struk kasir rapi format thermal lengkap dengan nomor transaksi, kasir, waktu WIB, dan rincian belanja.
+       - Tab Stok Inventori: Tabel status stok dan tombol `[+10 Restock]`.
+     - Integrasi ke `app/page.tsx` menggantikan mockup statis lama.
+     - Generative UI Standalone Artifact: `live_demo_widget.html` tersimpan di artifacts directory.
 - **Verifikasi**:
   - `npx tsc --noEmit`: 0 error.
-  - Test skrip E2E (`test_admin_and_acc.js`): 9 skenario pengujian lulus 100% (Register pending -> Login block -> Admin ACC -> Login success -> Inject credit -> Delete user).
-  - Snapshot visual Headless Chrome: Tab Approval, Tab Users, dan Tab AI Config teruji render mulus tanpa error.
+  - Pengujian interaktif headless browser (`test_interactions.js`):
+    - Tombol "Bayar & Cetak Struk" memunculkan modal struk thermal yang akurat.
+    - Klik pada input chat demo membuka modal ajakan pembuatan akun mandiri tanpa generate AI liar.
+    - Tangkapan layar tersimpan di `landing_live_demo.png`, `receipt_modal.png`, dan `demo_auth_modal.png`.
 
