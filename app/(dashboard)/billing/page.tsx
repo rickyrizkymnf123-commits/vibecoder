@@ -6,6 +6,7 @@ import {
   Coins,
   Cpu,
   Crown,
+  Check,
   CheckCircle2,
   Loader2,
   CreditCard,
