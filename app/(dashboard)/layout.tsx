@@ -20,7 +20,8 @@ import {
   Trash2,
   Mail,
   Star,
-  Zap
+  Zap,
+  ShieldCheck
 } from 'lucide-react';
 import { UserProfile, ChatSession } from '@/lib/types';
 import { KilatLogo } from '@/components/KilatLogo';
@@ -196,6 +197,7 @@ export default function DashboardLayout({
     }
     if (pathname === '/domains') return 'Custom Domain';
     if (pathname === '/pro') return 'Fitur Pro';
+    if (pathname === '/admin') return 'Superadmin Panel';
     if (pathname === '/billing') return 'Top-Up & Billing';
     if (pathname === '/apps') return 'Aplikasi Ter-publish';
     if (pathname === '/storage') return 'Storage Pribadi';
@@ -511,6 +513,21 @@ export default function DashboardLayout({
               <Crown className="w-3 h-3 text-amber-400" />
               <span className="hidden sm:inline">Pro</span>
             </Link>
+
+            {(user?.role === 'admin' || user?.username === 'demo') && (
+              <Link
+                href="/admin"
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-[11px] transition-colors ${
+                  pathname === '/admin'
+                    ? 'bg-violet-600/30 text-violet-300 border-violet-500/50 font-bold shadow-sm shadow-violet-600/20'
+                    : 'bg-slate-900/70 hover:bg-slate-800 border-slate-800 text-violet-300 hover:text-violet-200'
+                }`}
+                title="Superadmin Funnel"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-violet-400" />
+                <span className="hidden sm:inline">Admin</span>
+              </Link>
+            )}
 
             {/* Status */}
             <div className="hidden sm:flex items-center">

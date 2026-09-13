@@ -21,7 +21,13 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
 
     if (error || !data) return null;
     const { password_hash, ...profile } = data;
-    return profile as UserProfile;
+    const isAdmin = profile.username === 'demo' || profile.role === 'admin' || profile.email === 'demo@vibecoder.app';
+    return {
+      ...profile,
+      role: isAdmin ? 'admin' : (profile.role || 'user'),
+      status: profile.status || 'active',
+      is_approved: profile.is_approved !== undefined ? profile.is_approved : true
+    } as UserProfile;
   } catch (err) {
     console.error('Failed to getUserProfile:', err);
     return null;
@@ -41,7 +47,14 @@ export async function getUserByEmailOrUsername(
 
     if (error || !data) return null;
     const { password_hash, ...profile } = data;
-    return { profile: profile as UserProfile, passwordHash: password_hash || undefined };
+    const isAdmin = profile.username === 'demo' || profile.role === 'admin' || profile.email === 'demo@vibecoder.app';
+    const cleanProfile: UserProfile = {
+      ...profile,
+      role: isAdmin ? 'admin' : (profile.role || 'user'),
+      status: profile.status || 'active',
+      is_approved: profile.is_approved !== undefined ? profile.is_approved : true
+    };
+    return { profile: cleanProfile, passwordHash: password_hash || undefined };
   } catch (err) {
     console.error('Failed to getUserByEmailOrUsername:', err);
     return null;
@@ -102,6 +115,161 @@ export async function updateUserProfile(
     console.error('Failed to updateUserProfile:', err);
     return null;
   }
+}
+
+// ======================== ADMIN USER OPERATIONS ========================
+
+export async function getAllUsers(): Promise<UserProfile[]> {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('profiles')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error || !data) return [];
+    return data.map((row: any) => {
+      const { password_hash, ...profile } = row;
+      const isAdmin = profile.username === 'demo' || profile.role === 'admin' || profile.email === 'demo@vibecoder.app';
+      return {
+        ...profile,
+        role: isAdmin ? 'admin' : (profile.role || 'user'),
+        status: profile.status || 'active',
+        is_approved: profile.is_approved !== undefined ? profile.is_approved : true
+      } as UserProfile;
+    });
+  } catch (err) {
+    console.error('Failed to getAllUsers:', err);
+    return [];
+  }
+}
+
+export async function adminApproveUser(userId: string): Promise<boolean> {
+  try {
+    const { error } = await supabaseAdmin
+      .from('profiles')
+      .update({
+        status: 'active',
+        is_approved: true,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', userId);
+    return !error;
+  } catch (err) {
+    console.error('Failed to adminApproveUser:', err);
+    return false;
+  }
+}
+
+export async function adminRejectUser(userId: string): Promise<boolean> {
+  try {
+    const { error } = await supabaseAdmin
+      .from('profiles')
+      .update({
+        status: 'rejected',
+        is_approved: false,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', userId);
+    return !error;
+  } catch (err) {
+    console.error('Failed to adminRejectUser:', err);
+    return false;
+  }
+}
+
+export async function adminSetUserCredits(
+  userId: string,
+  appCredits: number,
+  aiCredits: number,
+  reason = 'Penyesuaian oleh Admin'
+): Promise<{ success: boolean; app_credits: number; ai_credits: number }> {
+  try {
+    const user = await getUserProfile(userId);
+    if (!user) throw new Error('User not found');
+
+    const newApp = Math.max(0, Math.round(appCredits));
+    const newAi = Math.max(0, Math.round(aiCredits));
+    const now = new Date().toISOString();
+
+    await supabaseAdmin
+      .from('profiles')
+      .update({
+        app_credits: newApp,
+        ai_credits: newAi,
+        updated_at: now
+      })
+      .eq('id', userId);
+
+    // Record audit trail
+    const txIdApp = `tx-app-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    await supabaseAdmin.from('credit_transactions').insert({
+      id: txIdApp,
+      user_id: userId,
+      type: 'app_credit',
+      amount: newApp - user.app_credits,
+      reason: `${reason} (Kredit App)`,
+      balance_after: newApp,
+      created_at: now
+    });
+
+    const txIdAi = `tx-ai-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    await supabaseAdmin.from('credit_transactions').insert({
+      id: txIdAi,
+      user_id: userId,
+      type: 'ai_credit',
+      amount: newAi - user.ai_credits,
+      reason: `${reason} (Kredit AI)`,
+      balance_after: newAi,
+      created_at: now
+    });
+
+    return { success: true, app_credits: newApp, ai_credits: newAi };
+  } catch (err) {
+    console.error('Failed to adminSetUserCredits:', err);
+    return { success: false, app_credits: 0, ai_credits: 0 };
+  }
+}
+
+export async function adminDeleteUser(userId: string): Promise<boolean> {
+  try {
+    const user = await getUserProfile(userId);
+    if (user && (user.username === 'demo' || user.role === 'admin')) {
+      throw new Error('Tidak dapat menghapus akun Administrator');
+    }
+
+    await supabaseAdmin.from('chat_messages').delete().eq('session_id', userId);
+    await supabaseAdmin.from('chat_sessions').delete().eq('user_id', userId);
+    await supabaseAdmin.from('apps').delete().eq('user_id', userId);
+    await supabaseAdmin.from('credit_transactions').delete().eq('user_id', userId);
+    await supabaseAdmin.from('payments').delete().eq('user_id', userId);
+    const { error } = await supabaseAdmin.from('profiles').delete().eq('id', userId);
+    return !error;
+  } catch (err) {
+    console.error('Failed to adminDeleteUser:', err);
+    return false;
+  }
+}
+
+export async function adminBulkDeleteUsers(userIds: string[]): Promise<{ deletedCount: number; errors: string[] }> {
+  let deletedCount = 0;
+  const errors: string[] = [];
+
+  for (const id of userIds) {
+    try {
+      const user = await getUserProfile(id);
+      if (user && (user.username === 'demo' || user.role === 'admin')) {
+        errors.push(`Akun admin (${user.username}) dilindungi dari penghapusan massal.`);
+        continue;
+      }
+      const ok = await adminDeleteUser(id);
+      if (ok) deletedCount++;
+      else errors.push(`Gagal menghapus user ID: ${id}`);
+    } catch (e: any) {
+      errors.push(e.message || `Error pada user ID: ${id}`);
+    }
+  }
+
+  return { deletedCount, errors };
 }
 
 // ======================== CREDIT OPERATIONS ========================

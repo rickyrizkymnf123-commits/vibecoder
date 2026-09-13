@@ -7,6 +7,9 @@ export interface UserProfile {
   ai_credits: number;
   is_pro: boolean;
   pro_until: string | null;
+  role?: 'admin' | 'user';
+  status?: 'active' | 'pending' | 'rejected' | 'suspended';
+  is_approved?: boolean;
   created_at: string;
   updated_at: string;
 }

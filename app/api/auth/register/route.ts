@@ -32,33 +32,23 @@ export async function POST(req: NextRequest) {
         email: email.trim().toLowerCase(),
         username: cleanUsername,
         subdomain,
-        app_credits: 1, // 1 App publish credit slot (untuk 1 aplikasi web)
-        ai_credits: 100000, // 100.000 Kredit AI untuk chat, perancangan, dan revisi berkali-kali
+        app_credits: 1, // 1 App publish credit slot
+        ai_credits: 100000, // 100.000 Kredit AI
         is_pro: false,
-        pro_until: null
+        pro_until: null,
+        role: 'user',
+        status: 'pending',
+        is_approved: false
       },
       passwordHash
     );
 
-    // Create session
-    const sessionToken = signSession({
-      userId: newProfile.id,
-      email: newProfile.email,
-      username: newProfile.username,
-      subdomain: newProfile.subdomain
+    return NextResponse.json({
+      success: true,
+      pendingApproval: true,
+      message: 'Pendaftaran berhasil! Akun Anda sedang menunggu persetujuan (ACC) dari Admin sebelum dapat digunakan.',
+      user: newProfile
     });
-
-    const isSecure = process.env.NODE_ENV === 'production' && req.nextUrl.protocol === 'https:';
-    const res = NextResponse.json({ success: true, user: newProfile });
-    res.cookies.set(SESSION_COOKIE_NAME, sessionToken, {
-      httpOnly: true,
-      secure: isSecure,
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 30 * 24 * 60 * 60
-    });
-
-    return res;
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Gagal mendaftar' }, { status: 500 });
   }

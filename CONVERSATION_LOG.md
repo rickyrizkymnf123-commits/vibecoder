@@ -875,3 +875,39 @@ Pengguna mengirim tangkapan layar antarmuka yang menunjukkan pembuatan aplikasi 
   4. *Fix Runtime Error `ReferenceError: Check is not defined`*:
      - Menambahkan impor komponen ikon `Check` dari `lucide-react` pada [app/(dashboard)/billing/page.tsx](file:///C:/Users/UC/.gemini/antigravity/scratch/vibecoder/app/(dashboard)/billing/page.tsx).
      - Verifikasi live headless browser: halaman `/billing` render 100% normal tanpa runtime error.
+
+## 41. Sesi 37: Pembangunan Superadmin Control Funnel, Sistem Approval (ACC) User, dan Integrasi Kredensial Baru
+- **Permintaan Pengguna**:
+  1. Membangun Superadmin Funnel (`/admin`) untuk manajemen pengguna, tambah user manual, hapus manual, hapus massal (bulk delete), pengaturan live API KoboiLLM, dan manajemen kredit manual.
+  2. Menerapkan sistem persetujuan pendaftaran: Setiap user baru yang mendaftar via web harus di-ACC (disetujui) oleh Admin sebelum dapat masuk / login.
+  3. Menyesuaikan harga paket Tier Pro Add-On menjadi Rp 100.000 / 30 hari dengan bundling 4 fitur (Custom Domain, Storage 10GB, Export Source Code ZIP/SQL, Push GitHub).
+  4. Mengintegrasikan kredensial baru: Vercel Token, GitHub PAT, dan Supabase Access Token.
+  5. Menerapkan aturan hemat token: wajib menggunakan targeted patching (`edit_file`) saat revisi.
+- **Implementasi & Perubahan Kode**:
+  1. *Database & Type Schema*:
+     - `lib/types.ts`: Menambahkan field `role?: 'admin' | 'user'`, `status?: 'active' | 'pending' | 'rejected'`, `is_approved?: boolean` ke `UserProfile` dan `SessionPayload`.
+     - Migrasi live PostgreSQL via Supabase Management API: Menambahkan kolom `role`, `status`, dan `is_approved` ke tabel `profiles` Supabase.
+  2. *Sistem ACC User (Persetujuan Admin)*:
+     - `app/api/auth/register/route.ts`: Pengguna baru otomatis berstatus `pending` (`is_approved: false`) dan tidak langsung login.
+     - `app/(auth)/register/page.tsx`: Menyajikan layar status sukses yang ramah menginfokan bahwa akun sedang menunggu persetujuan (ACC) Admin.
+     - `app/api/auth/login/route.ts`: Memblokir login bagi user berstatus `pending` dengan respons 403 Forbidden.
+  3. *Superadmin Funnel UI & Endpoints*:
+     - `app/(dashboard)/admin/page.tsx`: Antarmuka master lengkap dengan 4 tab:
+       - Tab 1: Persetujuan User (ACC) dengan tombol 1-klik `[✓ Setujui (ACC)]` dan `[✕ Tolak]`.
+       - Tab 2: Semua Pengguna dengan checkbox seleksi, tombol `[Hapus Massal]`, tombol `[+ Tambah User Manual]`, dan modal `[⚡ Suntik Kredit]`.
+       - Tab 3: Ikhtisar & Statistik (Total Users, Pending ACC, Total Apps, Saldo Beredar, Omset).
+       - Tab 4: Pengaturan API KoboiLLM dengan tombol `[⚡ Uji Koneksi API]` (latency check) dan `[Simpan Konfigurasi]`.
+     - Endpoints: `app/api/admin/stats/route.ts`, `app/api/admin/users/route.ts`, `app/api/admin/users/[userId]/approve/route.ts`, `app/api/admin/users/[userId]/credits/route.ts`, `app/api/admin/ai-config/route.ts`.
+     - Guard: `lib/auth/admin-guard.ts` melindungi seluruh rute admin agar hanya dapat diakses akun ber-role `admin`.
+     - Navigasi: Menambahkan tombol ungu `[Admin]` pada navbar `app/(dashboard)/layout.tsx`.
+  4. *Pembaruan Paket Pro*:
+     - Menyesuaikan harga paket Pro menjadi Rp 100.000 di `app/(dashboard)/billing/page.tsx` dan `app/api/payments/snap/route.ts`.
+  5. *Optimalisasi Token AI*:
+     - `lib/agent/loop.ts`: Mempertegas instruksi prompt agar agen wajib memakai `edit_file` saat melakukan iterasi/revisi parsial.
+  6. *Integrasi Kredensial Baru*:
+     - Memperbarui `VERCEL_TOKEN`, `GITHUB_PAT`, dan `SUPABASE_ACCESS_TOKEN` di `.env.local`.
+- **Verifikasi**:
+  - `npx tsc --noEmit`: 0 error.
+  - Test skrip E2E (`test_admin_and_acc.js`): 9 skenario pengujian lulus 100% (Register pending -> Login block -> Admin ACC -> Login success -> Inject credit -> Delete user).
+  - Snapshot visual Headless Chrome: Tab Approval, Tab Users, dan Tab AI Config teruji render mulus tanpa error.
+

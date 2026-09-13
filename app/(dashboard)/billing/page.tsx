@@ -333,11 +333,19 @@ export default function BillingPage() {
               <Crown className="w-4 h-4 text-amber-400" />
             </div>
             <div className="text-2xl sm:text-3xl font-black text-white mt-3">
-              Rp 149.000 <span className="text-xs font-normal text-slate-400">/ 30 hari</span>
+              Rp 100.000 <span className="text-xs font-normal text-slate-400">/ 30 hari</span>
             </div>
-            <p className="text-xs text-slate-400 mt-1">Akses penuh ekspor kode &amp; integrasi repo</p>
+            <p className="text-xs text-slate-400 mt-1">Paket Add-on Lengkap: Custom Domain, GitHub &amp; Ekspor Kode</p>
             <div className="my-4 border-t border-slate-800" />
             <ul className="space-y-2.5 text-xs text-slate-200">
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span><b>Pasang Custom Domain Sendiri</b> (A Record DNS)</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span><b>Storage Pribadi 10GB</b> Supabase Bucket</span>
+              </li>
               <li className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span><b>Download Source Code (.ZIP)</b></span>
@@ -349,10 +357,6 @@ export default function BillingPage() {
               <li className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span><b>Push ke GitHub Repo</b> via Personal PAT</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span><b>Storage Pribadi 10GB</b> Supabase Bucket</span>
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -376,7 +380,7 @@ export default function BillingPage() {
               )}
             </button>
             <button
-              onClick={() => handleSimulateWebhook('pro_monthly', 149000)}
+              onClick={() => handleSimulateWebhook('pro_monthly', 100000)}
               disabled={simulatingWebhook}
               className="w-full py-1.5 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-[10px] text-amber-300 transition-colors"
             >

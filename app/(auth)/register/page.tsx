@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Sparkles, Globe, ShieldAlert, Loader2, CheckCircle2, Zap } from 'lucide-react';
+import { Sparkles, Globe, ShieldAlert, Loader2, CheckCircle2, Zap, Clock, ArrowRight } from 'lucide-react';
 
 export default function PlatformRegisterPage() {
   const [email, setEmail] = useState('');
@@ -11,6 +11,8 @@ export default function PlatformRegisterPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [pendingApproval, setPendingApproval] = useState(false);
+  const [registeredUser, setRegisteredUser] = useState<string>('');
   const router = useRouter();
 
   const cleanSubdomain = username.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'nama-anda';
@@ -34,12 +36,52 @@ export default function PlatformRegisterPage() {
         return;
       }
 
+      if (data.pendingApproval) {
+        setPendingApproval(true);
+        setRegisteredUser(username);
+        setLoading(false);
+        return;
+      }
+
       window.location.href = '/c/new';
     } catch {
       setError('Terjadi kendala koneksi ke server');
       setLoading(false);
     }
   };
+
+  if (pendingApproval) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4 bg-[#0b0f19] relative">
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-amber-600/15 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="w-full max-w-md bg-slate-900/90 border border-amber-500/30 backdrop-blur-xl p-8 rounded-2xl shadow-2xl relative z-10 text-center">
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center mb-5 text-amber-400">
+            <Clock className="w-7 h-7 animate-pulse" />
+          </div>
+
+          <h2 className="text-2xl font-bold text-white tracking-tight">Pendaftaran Berhasil!</h2>
+          <p className="text-amber-300 font-semibold text-sm mt-2">Menunggu Persetujuan (ACC) dari Admin</p>
+
+          <div className="mt-4 p-4 rounded-xl bg-slate-950/70 border border-slate-800 text-left text-xs text-slate-300 space-y-2">
+            <p>Akun <b className="text-white">@{registeredUser}</b> telah tersimpan di sistem.</p>
+            <p className="text-slate-400">Demi keamanan dan alokasi sumber daya, akun Anda harus disetujui terlebih dahulu oleh Administrator sebelum dapat digunakan.</p>
+            <div className="pt-2 border-t border-slate-800 flex items-center gap-1.5 text-emerald-400">
+              <CheckCircle2 className="w-3.5 h-3.5" /> Bonus 1 Slot App + 100.000 Kredit AI aktif otomatis setelah di-ACC.
+            </div>
+          </div>
+
+          <Link
+            href="/login"
+            className="mt-6 w-full py-3 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-semibold text-sm shadow-lg shadow-violet-600/30 transition-all flex items-center justify-center gap-2"
+          >
+            <span>Kembali ke Halaman Masuk</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 bg-[#0b0f19] relative">
@@ -54,7 +96,7 @@ export default function PlatformRegisterPage() {
         </div>
 
         <h2 className="text-2xl font-bold text-white tracking-tight">Daftar Akun Kilat Tools</h2>
-        <p className="text-sm text-slate-400 mt-1">Dapatkan 1 Slot Publikasi App + 50.000 Kredit AI gratis</p>
+        <p className="text-sm text-slate-400 mt-1">Dapatkan 1 Slot Publikasi App + 100.000 Kredit AI</p>
 
         {error && (
           <div className="mt-4 p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300 text-sm flex items-center gap-2">
@@ -116,7 +158,7 @@ export default function PlatformRegisterPage() {
               <CheckCircle2 className="w-3.5 h-3.5" /> 1 Slot Publikasi App (Aktif Selamanya)
             </div>
             <div className="flex items-center gap-1.5 text-emerald-400">
-              <CheckCircle2 className="w-3.5 h-3.5" /> 50.000 Kredit Token AI Siap Pakai
+              <CheckCircle2 className="w-3.5 h-3.5" /> 100.000 Kredit Token AI Siap Pakai
             </div>
           </div>
 

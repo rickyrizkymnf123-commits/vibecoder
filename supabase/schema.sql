@@ -13,9 +13,12 @@ create table if not exists public.profiles (
   username text unique not null,
   subdomain text unique not null,
   app_credits integer default 1 not null check (app_credits >= 0),
-  ai_credits integer default 50000 not null check (ai_credits >= 0),
+  ai_credits integer default 100000 not null check (ai_credits >= 0),
   is_pro boolean default false not null,
   pro_until timestamptz,
+  role text default 'user' not null,
+  status text default 'pending' not null,
+  is_approved boolean default false not null,
   created_at timestamptz default now() not null,
   updated_at timestamptz default now() not null
 );

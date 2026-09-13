@@ -334,6 +334,13 @@
 - **Restorasi Riwayat Chat & Sesi**:
   - Riwayat sesi ditautkan ke `user_id: user-demo-1` di tabel `chat_sessions` dan `chat_messages` Supabase agar otomatis tampil di sidebar pengguna yang sedang aktif di browser. Sesi GudangKu kini menampilkan 8 checklist tercoret dan 24 aktivitas transparan.
 
-
-
-
+### Superadmin Funnel (`/admin`) & Sistem Persetujuan (ACC)
+- **Alur Pendaftaran Menunggu ACC**: Setiap user baru yang mendaftar via `/register` otomatis berstatus `pending` dan `is_approved = false`. Pengguna dicegah masuk ke dashboard hingga Admin menekan tombol `[✓ Setujui (ACC)]` di `/admin`.
+- **Superadmin Panel (`/admin`)**:
+  - Proteksi: `lib/auth/admin-guard.ts` (khusus role `admin` atau username `demo`).
+  - Tab 1: Persetujuan User (ACC) dengan tombol 1-klik Approve atau Reject.
+  - Tab 2: Manajemen Pengguna (Semua User) dengan pencarian, filter, seleksi checkbox, tombol Hapus Massal, Tambah User Manual, dan modal Suntik Kredit.
+  - Tab 3: Ikhtisar & Statistik Platform (Total Users, Pending, Apps, Saldo, Omset).
+  - Tab 4: Pengaturan Live API KoboiLLM (Base URL, API Key, Model Default, dan Uji Koneksi latency).
+- **Penyesuaian Tier Pro Add-On**: Rp 100.000 / 30 hari (Custom Domain, Storage 10GB, Export ZIP/SQL, Push GitHub).
+- **Efisiensi Token AI Engine**: Revisi diwajibkan menggunakan targeted patching `edit_file` guna mencegah full-file rewrite dan menghemat hingga 90% kredit token.

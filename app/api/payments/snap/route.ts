@@ -20,8 +20,8 @@ const PACKAGES: Record<string, { name: string; price: number; type: 'app_credit_
     type: 'ai_credit_topup'
   },
   pro_monthly: {
-    name: 'Langganan Forge Pro (30 Hari + 5 App + 250k AI)',
-    price: 149000,
+    name: 'Langganan Forge Pro (30 Hari + Custom Domain + 10GB Storage)',
+    price: 100000,
     type: 'pro_subscription'
   }
 };

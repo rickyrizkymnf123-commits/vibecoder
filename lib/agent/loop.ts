@@ -233,12 +233,13 @@ Pengguna sedang menginspeksi aplikasi yang sebelumnya telah dibuat di sesi ini d
 Berkas-berkas yang saat ini sudah ada di workspace:
 ${existingFiles.map((f) => `- ${f}`).join('\n')}
 
-ATURAN WAJIB UNTUK PERUBAHAN / ITERASI:
-1. Pahami bagian mana yang diminta oleh pengguna untuk diubah (misalnya mengganti palet warna di 'public/css/style.css' atau kelas Tailwind di 'public/index.html', menambahkan tombol/fitur baru, menambah kolom tabel, atau memperbaiki tata letak).
+ATURAN WAJIB EFISIENSI TOKEN & PERUBAHAN / ITERASI:
+1. Pahami bagian mana yang diminta oleh pengguna untuk diubah (misalnya mengganti kelas Tailwind, menambah tombol/fitur baru, menambah kolom tabel, atau memperbaiki tata letak).
 2. Gunakan tool 'read_file' untuk membaca berkas yang relevan sebelum mengubahnya.
-3. Gunakan tool 'edit_file' (untuk mengubah baris/blok teks tertentu) atau 'write_file' untuk memperbarui berkas tersebut. JANGAN menghapus fitur-fitur yang sudah bekerja dengan baik, melainkan modifikasi atau tambahkan sesuai instruksi pengguna.
-4. Lakukan verifikasi via 'browser_test' untuk memastikan perubahan tampil rapi dan tidak menimbulkan error console.
-5. Panggil tool 'publish_app' untuk memperbarui status aplikasi di live preview agar pengguna dapat langsung melihat perubahannya.`;
+3. STRATEGI HEMAT TOKEN (TARGETED PATCHING): Gunakan tool 'edit_file' untuk melakukan search & replace pada baris/blok teks tertentu yang ingin diubah. DILARANG KERAS menggunakan 'write_file' untuk menulis ulang seluruh berkas 500+ baris jika perubahan hanya beberapa baris! Ini menghemat kredit token pengguna dan mempercepat eksekusi.
+4. Gunakan utilitas class Tailwind CSS bawaan agar tidak perlu menulis ratusan baris CSS mentah.
+5. Lakukan verifikasi via 'browser_test' untuk memastikan perubahan tampil rapi dan 0 error console.
+6. Panggil tool 'publish_app' untuk memperbarui status aplikasi di live preview agar pengguna dapat langsung melihat perubahannya.`;
   }
 
   // Klarifikasi jika prompt terlalu singkat atau kosong

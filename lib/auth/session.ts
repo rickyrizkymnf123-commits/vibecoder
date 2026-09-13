@@ -10,6 +10,7 @@ export interface SessionPayload {
   email: string;
   username: string;
   subdomain: string;
+  role?: 'admin' | 'user';
   exp: number;
 }
 
