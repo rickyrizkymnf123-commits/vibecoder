@@ -493,17 +493,15 @@ export default function DashboardLayout({
               <span>Live App {userApps.length > 0 ? `(${userApps.length})` : ''}</span>
             </button>
 
-            <Link
-              href="/domains"
-              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-[11px] transition-colors ${
-                pathname === '/domains'
-                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                  : 'bg-slate-900/70 hover:bg-slate-800 border-slate-800 text-slate-300'
-              }`}
+            <button
+              type="button"
+              onClick={() => setShowAppChooserModal(true)}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-slate-800 bg-slate-900/70 hover:bg-slate-800 text-slate-300 hover:text-white text-[11px] transition-colors cursor-pointer"
+              title="Pilih dan Cek Aplikasi Anda"
             >
               <span>🌐</span>
               <span className="hidden sm:inline">Domain</span>
-            </Link>
+            </button>
 
             <Link
               href="/pro"

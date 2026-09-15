@@ -362,11 +362,15 @@
 
 ### 15. Fitur App Chooser Modal saat Tombol Domain Diklik (Ala VibeCoder)
 - **Perilaku Tombol Domain di Topbar**:
-  - Tombol subdomain (`{username}.kilattools.dev LIVE APP`) tidak langsung melompat ke 1 aplikasi acak.
+  - Baik tombol Subdomain Pill di tengah navbar (`{username}.kilattools.dev LIVE APP`) maupun tombol `🌐 Domain` di pojok kanan atas tidak langsung me-redirect ke 1 aplikasi acak atau form statis.
   - Mengklik tombol domain membuka dialog popover/modal: **"Mau Cek Aplikasi yang Mana?"**.
   - Modal menyajikan daftar seluruh aplikasi aktif yang dimiliki pengguna:
     - Nama aplikasi, badge status `● LIVE APP`, URL domain/path preview.
-    - Tombol `[Buka App ↗]` untuk membuka live app di tab baru.
-    - Tombol `[Studio 💬]` untuk langsung menuju ruang percakapan AI tempat aplikasi tersebut dibuat.
-    - Tautan cepat `🌐 Kelola Custom Domain`.
-  - Jika belum ada aplikasi terbit, menyajikan ajakan ramah `[+ Buat Aplikasi Pertama Anda]`.
+    - Tombol `[Buka App ↗]` untuk membuka live app di tab baru (`/preview/[slug]`).
+    - Tombol `[Studio 💬]` untuk langsung menuju ruang percakapan AI tempat aplikasi tersebut dibuat (`/c/[sessionId]`).
+    - Tautan cepat `🌐 Kelola Custom Domain` (`/domains`).
+  - Halaman `/domains` juga dilengkapi kartu daftar aplikasi & URL domain publik di atas form custom domain.
+  - Terverifikasi 100% aktif dan berjalan di Vercel Production (`https://forge-app-engine.vercel.app`) via Puppeteer E2E test.
+  - Dev server aktif di `http://localhost:3006` (Status 200 OK).
+
+

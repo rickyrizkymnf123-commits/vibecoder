@@ -125,11 +125,89 @@ export default function CustomDomainsPage() {
         </div>
       </div>
 
+      {/* Section: Daftar Aplikasi & Subdomain Publik Anda */}
+      <div className="p-5 sm:p-6 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-xl space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div>
+            <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+              <Globe className="w-4 h-4 text-emerald-400" />
+              <span>Daftar Aplikasi & Domain Publik Anda</span>
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Pilih aplikasi yang ingin Anda buka atau hubungkan ke custom domain sendiri.
+            </p>
+          </div>
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800">
+            {apps.length} Aplikasi Aktif
+          </span>
+        </div>
+
+        {apps.length === 0 && !loading ? (
+          <div className="text-xs text-slate-400 py-4 text-center">
+            Belum ada aplikasi yang diterbitkan. Silakan buat aplikasi baru terlebih dahulu.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {apps.map((app) => (
+              <div
+                key={app.id}
+                className="p-4 rounded-xl bg-slate-950 border border-slate-800/90 hover:border-slate-700 transition-all flex flex-col justify-between space-y-3"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-xs sm:text-sm font-bold text-white truncate">{app.name}</h3>
+                    <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">
+                      LIVE
+                    </span>
+                  </div>
+                  <div className="mt-1 font-mono text-[11px] text-indigo-300 truncate">
+                    /{app.slug}
+                  </div>
+                  {app.custom_domain && (
+                    <div className="mt-1 font-mono text-[11px] text-amber-400 flex items-center gap-1">
+                      <span>🌐</span>
+                      <span>{app.custom_domain}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 pt-2 border-t border-slate-900">
+                  <a
+                    href={`/preview/${app.slug}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold text-center transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                  >
+                    <span>Buka App</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedAppId(app.id);
+                      const el = document.getElementById('custom-domain-form');
+                      if (el) el.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
+                      selectedAppId === app.id
+                        ? 'bg-violet-600 text-white border-violet-500'
+                        : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-800'
+                    }`}
+                  >
+                    Atur Domain
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Main Connect Form Card */}
-      <div className="p-5 sm:p-6 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-xl space-y-5">
+      <div id="custom-domain-form" className="p-5 sm:p-6 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-xl space-y-5">
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-            <span>Tambah Domain Kustom</span>
+            <span>Tambah Custom Domain Toko Sendiri</span>
           </h2>
           <span className="text-[11px] text-slate-500 font-mono">Vercel Edge Network</span>
         </div>
