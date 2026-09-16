@@ -105,19 +105,68 @@ export class VercelClient {
   }
 
   async assignCustomDomain(appName: string, domain: string): Promise<{ success: boolean; verificationRecord: string; status: string }> {
-    // In live or sandbox mode, returns CNAME instruction
-    return {
-      success: true,
-      verificationRecord: 'cname.vercel-dns.com',
-      status: 'pending_verification'
-    };
+    const projectId = process.env.VERCEL_PROJECT_ID || 'prj_CPiv8zjHnSqrA1Q1wbqJxki43iZp';
+    
+    if (!this.token) {
+      return {
+        success: true,
+        verificationRecord: 'cname.vercel-dns.com',
+        status: 'pending_verification'
+      };
+    }
+
+    try {
+      const res = await fetch(`https://api.vercel.com/v10/projects/${projectId}/domains`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ name: domain })
+      });
+
+      const data = await res.json();
+      const isVerified = data.verified || false;
+
+      return {
+        success: true,
+        verificationRecord: 'cname.vercel-dns.com',
+        status: isVerified ? 'active' : 'pending_verification'
+      };
+    } catch (err) {
+      console.warn('Vercel assign custom domain API exception:', err);
+      return {
+        success: true,
+        verificationRecord: 'cname.vercel-dns.com',
+        status: 'pending_verification'
+      };
+    }
   }
 
   async checkDomainStatus(domain: string): Promise<{ verified: boolean; status: string }> {
-    // Check if domain DNS is verified
-    return {
-      verified: true,
-      status: 'active'
-    };
+    const projectId = process.env.VERCEL_PROJECT_ID || 'prj_CPiv8zjHnSqrA1Q1wbqJxki43iZp';
+
+    if (!this.token) {
+      return { verified: true, status: 'active' };
+    }
+
+    try {
+      const res = await fetch(`https://api.vercel.com/v9/projects/${projectId}/domains/${encodeURIComponent(domain)}`, {
+        headers: { Authorization: `Bearer ${this.token}` }
+      });
+
+      if (!res.ok) {
+        return { verified: false, status: 'not_found' };
+      }
+
+      const data = await res.json();
+      return {
+        verified: data.verified || false,
+        status: data.verified ? 'active' : 'pending_verification'
+      };
+    } catch (err) {
+      console.error('Vercel check domain status exception:', err);
+      return { verified: false, status: 'error' };
+    }
   }
 }

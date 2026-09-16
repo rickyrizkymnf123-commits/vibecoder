@@ -450,7 +450,7 @@ export default function DashboardLayout({
             >
               <Zap className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
               <span className="font-semibold text-slate-200 group-hover:text-amber-300">
-                {user?.subdomain || user?.username || 'demo'}.kilattools.dev
+                {user?.subdomain || user?.username || 'demo'}.kilatstools.my.id
               </span>
               <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-sans uppercase font-bold tracking-wider">
                 LIVE APP {userApps.length > 0 ? `(${userApps.length})` : ''}
@@ -594,7 +594,7 @@ export default function DashboardLayout({
                       Mau Cek Aplikasi yang Mana?
                     </h3>
                     <p className="text-xs text-slate-400 font-mono mt-0.5">
-                      Domain: <span className="text-amber-400 font-semibold">{user?.subdomain || user?.username || 'demo'}.kilattools.dev</span>
+                      Domain: <span className="text-amber-400 font-semibold">{user?.subdomain || user?.username || 'demo'}.kilatstools.my.id</span>
                     </p>
                   </div>
                 </div>
@@ -643,7 +643,7 @@ export default function DashboardLayout({
                           </span>
                         </div>
                         <p className="text-[11px] text-slate-400 font-mono mt-1 truncate">
-                          URL: <span className="text-indigo-300">{user?.subdomain || user?.username || 'app'}.kilattools.dev/{app.slug}</span>
+                          URL: <span className="text-indigo-300">{user?.subdomain || user?.username || 'app'}.kilatstools.my.id/{app.slug}</span>
                         </p>
                       </div>
 
