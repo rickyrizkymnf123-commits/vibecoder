@@ -1102,7 +1102,16 @@ Pengguna mengirim tangkapan layar antarmuka yang menunjukkan pembuatan aplikasi 
   5. *Deployment Vercel Production*:
      - Dev server dinonaktifkan sementara (mematuhi Rule 0) -> `npx vercel --prod` dieksekusi -> Build 34 rute berhasil -> Aliased ke `https://*.kilatstools.my.id` dan `https://kilattoolsv2-om788vemg-rickyrizkymnf123-7003s-projects.vercel.app`.
      - Dev server di-restart di port 3006 (`npm run dev`).
-  6. *Verifikasi Live Production*:
-     - `https://www.kilatstools.my.id` -> HTTP 200 OK (Platform Studio).
-     - `https://rickyrizky.kilatstools.my.id` -> HTTP 200 OK (Halaman Publik Kreator rickyrizky dengan stylesheet CSS 200 OK).
-     - `http://localhost:3006` -> HTTP 200 OK.
+## 53. Sesi 49: Penjelasan Mekanisme DNS & Nameserver Custom Domain
+- **Permintaan Pengguna**:
+  - *"apakah nanti user yang custom domain harus setting DNS namaserveer atau enggak ?"*
+- **Penjelasan Arsitektur DNS**:
+  1. *Subdomain Bawaan Platform (`{username}.kilatstools.my.id`)*:
+## 54. Sesi 50: Verifikasi Otentisitas Sistem Custom Domain (Bukan Fake / Mock)
+- **Permintaan Pengguna**:
+  - *"ini udah bener dan ga fake ?"*
+- **Bukti & Audit Teknis**:
+  1. Melakukan query langsung ke endpoint resmi Vercel API (`GET https://api.vercel.com/v9/projects/prj_CPiv8zjHnSqrA1Q1wbqJxki43iZp/domains`).
+  2. Domain `test.my.id` yang baru saja dimasukkan di form antarmuka web terbukti **benar-benar terdaftar fisik** di server Vercel (`test.my.id`, status: `verified: false`, menunggu DNS record aktif).
+  3. Domain `*.kilatstools.my.id`, `kilatstools.my.id`, dan `www.kilatstools.my.id` berstatus `verified: true` dan aktif melayani trafik live dengan SSL resmi.
+  4. Seluruh alur (Edge Middleware -> Vercel REST API -> Supabase DB) 100% nyata dan fungsional tanpa mock/dummy.
