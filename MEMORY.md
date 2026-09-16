@@ -373,4 +373,24 @@
   - Terverifikasi 100% aktif dan berjalan di Vercel Production (`https://forge-app-engine.vercel.app`) via Puppeteer E2E test.
   - Dev server aktif di `http://localhost:3006` (Status 200 OK).
 
-
+### 16. Integrasi Domain Resmi (kilatstools.my.id) & Edge Middleware Multi-Tenant
+- **Domain Resmi Platform**:
+  - `https://www.kilatstools.my.id` (Platform Studio & Landing Page - Verified HTTP 200 OK).
+  - Wildcard Subdomain `*.kilatstools.my.id` terdaftar di project Vercel `forge` (`prj_CPiv8zjHnSqrA1Q1wbqJxki43iZp`).
+- **Next.js Edge Middleware Multi-Tenant Routing (`middleware.ts`)**:
+  - Host-based automatic dynamic routing:
+    - Root / Main domain (`kilatstools.my.id`, `www.kilatstools.my.id`, `localhost`, `vercel.app`) -> Pass through ke platform landing page & studio.
+    - Subdomain root (`https://{username}.kilatstools.my.id/`) -> Rewrite ke halaman direktori profil kreator `/u/{username}`.
+    - Subdomain app path (`https://{username}.kilatstools.my.id/{slug}`) -> Rewrite langsung ke interactive preview `/preview/{slug}`.
+    - Toko / Client Custom Domain (misal `kasir.tokoberkah.com`) -> Rewrite ke live application runtime.
+- **Halaman Publik Direktori Subdomain (`app/u/[username]/page.tsx`)**:
+  - Menyajikan halaman publik responsif yang menampilkan:
+    - Profil kreator & badge status Pro.
+    - Judul *"Aplikasi Publik {username}"*.
+    - Grid kartu seluruh aplikasi aktif milik user lengkap dengan tombol akses langsung `[Buka App ↗]`.
+- **Vercel Dynamic Custom Domain API (`lib/vercel/client.ts`)**:
+  - Menghubungkan form custom domain di `/domains` langsung ke Vercel REST API untuk registrasi domain klien dan verifikasi DNS record secara real-time.
+- **Status Deploy & Repository**:
+  - GitHub: Remote `main` tersinkronisasi 100% (`https://github.com/rickyrizkymnf123-commits/vibecoder.git`).
+  - Vercel: Production build `dpl_8KxVCKW4dR4R2rLtYn2CX2YxAsCN` READY dan aliased ke `https://*.kilatstools.my.id`.
+  - Local Dev Server: Aktif di `http://localhost:3006` (CSS & Routes HTTP 200 OK).

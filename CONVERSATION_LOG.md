@@ -1083,13 +1083,26 @@ Pengguna mengirim tangkapan layar antarmuka yang menunjukkan pembuatan aplikasi 
      - `kilatstools.my.id` (Status: Verified, HTTP 308 redirect ke www).
      - `www.kilatstools.my.id` (Status: Verified, HTTP 200 OK Live!).
   3. Mendaftarkan Wildcard Subdomain:
-     - Berhasil mendaftarkan `*.kilatstools.my.id` ke Vercel API (`verified: true`).
-     - Setiap user kini dapat memiliki subdomain nyata seperti `{username}.kilatstools.my.id`.
-
-
-
-
-
-
-
-
+## 52. Sesi 48: Implementasi Multi-Tenant Routing Subdomain & Deploy Produksi
+- **Permintaan Pengguna**:
+  - *"iya sekalian custom domain juga"*
+- **Hasil Eksekusi**:
+  1. *Next.js Edge Middleware (`middleware.ts`)*:
+     - Mengimplementasikan host-based multi-tenant routing:
+       - Domain utama (`kilatstools.my.id`, `www.kilatstools.my.id`, `localhost`, `vercel.app`) -> Pass through ke platform studio & dashboard.
+       - Subdomain pengguna (`https://{username}.kilatstools.my.id/`) -> Rewrite ke direktori publik `/u/{username}`.
+       - Subdomain app path (`https://{username}.kilatstools.my.id/{slug}`) -> Rewrite langsung ke runtime interactive preview `/preview/{slug}`.
+       - Custom domain toko (misal `kasir.tokoberkah.com`) -> Rewrite ke live application runtime.
+  2. *Halaman Publik Direktori Subdomain (`app/u/[username]/page.tsx`)*:
+     - Menampilkan profil kreator, badge status Pro, dan katalog kartu aplikasi aktif milik user lengkap dengan tombol akses langsung `[Buka App ↗]`.
+  3. *Vercel API Dynamic Custom Domain (`lib/vercel/client.ts`)*:
+     - Terhubung ke Vercel REST API project `prj_CPiv8zjHnSqrA1Q1wbqJxki43iZp` untuk registrasi domain custom otomatis dan pengecekan status DNS real-time.
+  4. *Push ke GitHub*:
+     - Commit `feat: implement edge middleware multi-tenant routing, user subdomain directory page, and vercel custom domain api` berhasil di-push ke remote `origin/main` (`https://github.com/rickyrizkymnf123-commits/vibecoder.git`).
+  5. *Deployment Vercel Production*:
+     - Dev server dinonaktifkan sementara (mematuhi Rule 0) -> `npx vercel --prod` dieksekusi -> Build 34 rute berhasil -> Aliased ke `https://*.kilatstools.my.id` dan `https://kilattoolsv2-om788vemg-rickyrizkymnf123-7003s-projects.vercel.app`.
+     - Dev server di-restart di port 3006 (`npm run dev`).
+  6. *Verifikasi Live Production*:
+     - `https://www.kilatstools.my.id` -> HTTP 200 OK (Platform Studio).
+     - `https://rickyrizky.kilatstools.my.id` -> HTTP 200 OK (Halaman Publik Kreator rickyrizky dengan stylesheet CSS 200 OK).
+     - `http://localhost:3006` -> HTTP 200 OK.
