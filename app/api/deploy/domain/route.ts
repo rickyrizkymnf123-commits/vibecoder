@@ -35,13 +35,39 @@ export async function POST(req: NextRequest) {
     domain_status: 'pending_verification'
   });
 
+  const isApex = cleanDomain.split('.').length <= 3 && !cleanDomain.startsWith('www.');
+  const subdomainPart = cleanDomain.split('.')[0];
+
   return NextResponse.json({
     success: true,
     app: updated,
     dnsInstructions: {
-      type: 'CNAME',
-      host: cleanDomain,
-      value: assignResult.verificationRecord,
+      domain: cleanDomain,
+      isApex,
+      records: isApex ? [
+        {
+          type: 'A',
+          host: '@',
+          value: '76.76.21.21',
+          desc: 'Untuk Domain Utama (Apex)'
+        },
+        {
+          type: 'CNAME',
+          host: 'www',
+          value: 'cname.vercel-dns.com',
+          desc: 'Untuk Subdomain www'
+        }
+      ] : [
+        {
+          type: 'CNAME',
+          host: subdomainPart,
+          value: 'cname.vercel-dns.com',
+          desc: `Untuk Subdomain ${cleanDomain}`
+        }
+      ],
+      type: isApex ? 'A' : 'CNAME',
+      host: isApex ? '@' : subdomainPart,
+      value: isApex ? '76.76.21.21' : 'cname.vercel-dns.com',
       ttl: 'Auto'
     }
   });
