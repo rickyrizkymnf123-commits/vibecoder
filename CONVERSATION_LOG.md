@@ -1107,11 +1107,19 @@ Pengguna mengirim tangkapan layar antarmuka yang menunjukkan pembuatan aplikasi 
   - *"apakah nanti user yang custom domain harus setting DNS namaserveer atau enggak ?"*
 - **Penjelasan Arsitektur DNS**:
   1. *Subdomain Bawaan Platform (`{username}.kilatstools.my.id`)*:
-## 54. Sesi 50: Verifikasi Otentisitas Sistem Custom Domain (Bukan Fake / Mock)
+## 55. Sesi 51: Redesain Topbar Minimalis ala VibeCoder & Pembersihan Menyeluruh forge.dev ke kilatstools.my.id
 - **Permintaan Pengguna**:
-  - *"ini udah bener dan ga fake ?"*
-- **Bukti & Audit Teknis**:
-  1. Melakukan query langsung ke endpoint resmi Vercel API (`GET https://api.vercel.com/v9/projects/prj_CPiv8zjHnSqrA1Q1wbqJxki43iZp/domains`).
-  2. Domain `test.my.id` yang baru saja dimasukkan di form antarmuka web terbukti **benar-benar terdaftar fisik** di server Vercel (`test.my.id`, status: `verified: false`, menunggu DNS record aktif).
-  3. Domain `*.kilatstools.my.id`, `kilatstools.my.id`, dan `www.kilatstools.my.id` berstatus `verified: true` dan aktif melayani trafik live dengan SSL resmi.
-  4. Seluruh alur (Edge Middleware -> Vercel REST API -> Supabase DB) 100% nyata dan fungsional tanpa mock/dummy.
+  - Mengubah tampilan UI & tata letak topbar agar lebih rapi, modern, dan mudah dipahami seperti di VibeCoder.
+  - Memperbaiki semua domain `forge.dev` yang masih muncul agar menjadi `kilatstools.my.id` (`{username}.kilatstools.my.id`).
+- **Hasil Eksekusi**:
+  1. *Pembersihan Menyeluruh Domain `forge.dev`*:
+     - Mengubah seluruh referensi di `.env.local`, `lib/vercel/client.ts`, `lib/builder/generator.ts`, `app/(dashboard)/account/page.tsx`, `app/(auth)/register/page.tsx`, `app/(dashboard)/admin/page.tsx`, `app/page.tsx`, dan `app/(dashboard)/layout.tsx` menjadi `kilatstools.my.id`.
+     - Setiap user kini resmi mendapatkan alamat: `{username}.kilatstools.my.id`.
+  2. *Redesain Topbar & Layout Dashboard (`app/(dashboard)/layout.tsx`)*:
+     - **Center Link (1:1 VibeCoder Style)**: Menampilkan tautan elegan minimalis `↗ {username}.kilatstools.my.id` dengan icon `↗` dan badge `LIVE (N)` yang ketika diklik membuka App Chooser Modal.
+     - **Resource Capsule**: Menggabungkan saldo App dan AI Token dalam 1 kapsul modern (`[🗂 999 App | ⚡ 10000k AI]`).
+     - **Grouped Quick Actions**: Tombol `🌐 Domain`, `👑 Pro`, `🛡 Admin`, dan `● Idle` tersusun proporsional di kanan tanpa membuat topbar sesak/penuh.
+  3. *Deployment & Sinkronisasi*:
+     - GitHub: Di-push ke branch `main` (`c3fa12b`).
+     - Vercel Production: Selesai di-deploy (`dpl_9AqioM5FVmqyb6X7NuxsLosU5CG8`) dan ter-alias ke `https://*.kilatstools.my.id`.
+     - Local Dev Server: Aktif di port 3006 (HTTP 200 OK).
