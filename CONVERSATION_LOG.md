@@ -1123,3 +1123,22 @@ Pengguna mengirim tangkapan layar antarmuka yang menunjukkan pembuatan aplikasi 
      - GitHub: Di-push ke branch `main` (`c3fa12b`).
      - Vercel Production: Selesai di-deploy (`dpl_9AqioM5FVmqyb6X7NuxsLosU5CG8`) dan ter-alias ke `https://*.kilatstools.my.id`.
      - Local Dev Server: Aktif di port 3006 (HTTP 200 OK).
+
+## 56. Sesi 52: Eliminasi Path /preview/ Menjadi Direct Subdomain URL (1:1 VibeCoder)
+- **Permintaan Pengguna**:
+  - Mengubah URL aplikasi yang sudah jadi agar tidak menggunakan path `/preview/` (misal bukan `https://www.kilatstools.my.id/preview/gudangku-inventori-stok`).
+  - Menjadikan URL langsung rapi dan profesional seperti VibeCoder: `https://{username}.kilatstools.my.id/{slug}` (misal `https://rickyrizky.kilatstools.my.id/gudangku-inventori-stok`).
+- **Hasil Eksekusi**:
+  1. *Next.js Edge Middleware (`middleware.ts`)*:
+     - URL `https://{username}.kilatstools.my.id/{slug}` otomatis di-rewrite secara transparan ke `/api/preview/${slug}/raw` (menyajikan runtime web application HTML/CSS/JS mandiri tanpa mengubah URL di browser).
+     - URL custom domain klien (`kasir.tokoberkah.com`) di-rewrite langsung ke `/api/preview/custom-domain-runtime?domain={host}`.
+  2. *Pembaruan Seluruh Tautan Tombol & Kartu UI*:
+     - **App Chooser Modal (`app/(dashboard)/layout.tsx`)**: Tombol `[Buka App ↗]` kini langsung membuka `https://{username}.kilatstools.my.id/{slug}`.
+     - **Direktori Publik (`app/u/[username]/page.tsx`)**: Tombol `[Buka App ↗]` membuka `https://{username}.kilatstools.my.id/{slug}`.
+     - **Chat Studio (`app/(dashboard)/c/[sessionId]/page.tsx`)**: Kartu rilis aplikasi ter-publish menampilkan dan menyalin tautan resmi `https://{username}.kilatstools.my.id/{slug}`.
+     - **Domains Page (`app/(dashboard)/domains/page.tsx`)**: Tombol aksi menggunakan URL direct subdomain.
+  3. *Uji Verifikasi Live*:
+     - Akses `https://rickyrizky.kilatstools.my.id/gudangku-inventori-stok` -> **HTTP 200 OK** (Content-Type: `text/html`, 97.550 bytes, menyajikan aplikasi GudangKu secara mandiri).
+  4. *Deployment & Git*:
+     - GitHub: Di-push ke `origin/main` (`571dd56`).
+     - Vercel Production: Deployment `dpl_4XEMUsv6DAGvZ3J6fKFAkS5E8FcW` READY.
