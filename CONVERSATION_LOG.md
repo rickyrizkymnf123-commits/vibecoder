@@ -1137,8 +1137,18 @@ Pengguna mengirim tangkapan layar antarmuka yang menunjukkan pembuatan aplikasi 
      - **Direktori Publik (`app/u/[username]/page.tsx`)**: Tombol `[Buka App ↗]` membuka `https://{username}.kilatstools.my.id/{slug}`.
      - **Chat Studio (`app/(dashboard)/c/[sessionId]/page.tsx`)**: Kartu rilis aplikasi ter-publish menampilkan dan menyalin tautan resmi `https://{username}.kilatstools.my.id/{slug}`.
      - **Domains Page (`app/(dashboard)/domains/page.tsx`)**: Tombol aksi menggunakan URL direct subdomain.
-  3. *Uji Verifikasi Live*:
-     - Akses `https://rickyrizky.kilatstools.my.id/gudangku-inventori-stok` -> **HTTP 200 OK** (Content-Type: `text/html`, 97.550 bytes, menyajikan aplikasi GudangKu secara mandiri).
+## 57. Sesi 53: Fitur Hapus / Putuskan Custom Domain
+- **Permintaan Pengguna**:
+  - *"tambahkan hapus custom domain"*
+- **Hasil Eksekusi**:
+  1. *Backend Vercel Client (`lib/vercel/client.ts`)*:
+     - Menambahkan method `removeCustomDomain(domain)` yang memanggil endpoint Vercel REST API: `DELETE https://api.vercel.com/v9/projects/{projectId}/domains/{domain}`.
+  2. *API Route Handler (`app/api/deploy/domain/route.ts`)*:
+     - Menambahkan HTTP handler `DELETE /api/deploy/domain` yang memverifikasi kepemilikan user/admin, menghapus domain dari server Vercel, dan mengosongkan kolom `custom_domain` & `domain_status` di Supabase.
+  3. *Antarmuka Pengguna (`app/(dashboard)/domains/page.tsx`)*:
+     - Memperbaiki label header kolom: `Subdomain Kilat Tools`.
+     - Menambahkan tombol aksi `[🗑 Hapus]` berwarna merah dengan icon `Trash2` dan loading spinner di samping tombol `[⟳ Cek DNS]`.
+     - Dilengkapi dialog konfirmasi keamanan sebelum penghapusan.
   4. *Deployment & Git*:
-     - GitHub: Di-push ke `origin/main` (`571dd56`).
-     - Vercel Production: Deployment `dpl_4XEMUsv6DAGvZ3J6fKFAkS5E8FcW` READY.
+     - GitHub: Di-push ke `origin/main` (`a50a223`).
+     - Vercel Production: Deployment `dpl_8JEUcTHpz7Qkuc1Tn2hqPuBWfL4o` LIVE & READY.
