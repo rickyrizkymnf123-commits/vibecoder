@@ -532,7 +532,7 @@ export default function AdminPage() {
                       <div className="mt-4 p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-1.5 text-xs">
                         <div className="flex items-center justify-between text-slate-400">
                           <span>Subdomain:</span>
-                          <span className="text-slate-200 font-mono">{user.subdomain}.forge.dev</span>
+                          <span className="text-slate-200 font-mono">{user.subdomain}.kilatstools.my.id</span>
                         </div>
                         <div className="flex items-center justify-between text-slate-400">
                           <span>Kredit Bawaan:</span>

@@ -31,7 +31,7 @@ export class VercelClient {
 
   async deploy(appName: string, files: Record<string, string>, subdomain = 'user'): Promise<VercelDeployResult> {
     const slug = appName.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-    const baseDomain = process.env.BASE_DOMAIN || 'forge.dev';
+    const baseDomain = process.env.BASE_DOMAIN || 'kilatstools.my.id';
     const expectedPublicUrl = `https://${subdomain}.${baseDomain}/${slug}`;
 
     // If no real Vercel token or mock token, return realistic deployment result

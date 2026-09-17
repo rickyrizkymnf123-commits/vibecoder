@@ -536,7 +536,7 @@ export default function AccountPage() {
               </span>
               <div className="flex items-center gap-2 font-mono text-violet-300 mt-0.5">
                 <Globe className="w-3.5 h-3.5 text-violet-400" />
-                <span>{user?.subdomain}.forge.dev</span>
+                <span>{user?.subdomain}.kilatstools.my.id</span>
               </div>
             </div>
 

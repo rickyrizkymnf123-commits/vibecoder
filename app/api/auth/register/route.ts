@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
 
     const passwordHash = hashPassword(password);
     const userId = `user-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-    const subdomain = cleanUsername; // e.g. user.forge.dev
+    const subdomain = cleanUsername; // e.g. user.kilatstools.my.id
 
     const newProfile = await createUserProfile(
       {

@@ -135,7 +135,7 @@ export default function PlatformRegisterPage() {
             {/* Live Subdomain Badge */}
             <div className="mt-2 p-2 rounded-lg bg-violet-950/40 border border-violet-500/20 flex items-center gap-2 text-xs text-violet-300">
               <Globe className="w-3.5 h-3.5 text-violet-400 shrink-0" />
-              <span>Subdomain Anda: <b>{cleanSubdomain}.forge.dev</b></span>
+              <span>Subdomain Anda: <b>{cleanSubdomain}.kilatstools.my.id</b></span>
             </div>
           </div>
 

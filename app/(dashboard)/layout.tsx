@@ -397,8 +397,8 @@ export default function DashboardLayout({
             <Mail className="w-3 h-3 text-slate-400 shrink-0" />
             <span className="truncate">
               Butuh bantuan? Email ke:{' '}
-              <a href="mailto:cs@forge.dev" className="text-violet-400 hover:underline">
-                cs@forge.dev
+              <a href="mailto:cs@kilatstools.my.id" className="text-violet-400 hover:underline">
+                cs@kilatstools.my.id
               </a>
             </span>
           </div>
@@ -429,40 +429,54 @@ export default function DashboardLayout({
 
       {/* Main Content Area (100dvh safe) */}
       <main className="flex-1 h-[calc(100dvh-53px)] md:h-[100dvh] overflow-hidden bg-[#0b0f19] flex flex-col">
-        {/* Top Navbar Header (Balanced Spacious Layout: Left Title, Center Live App & Credits, Right Tools) */}
-        <header className="px-6 sm:px-8 py-3 border-b border-slate-800/80 bg-slate-950/85 backdrop-blur-md flex items-center justify-between gap-4 shrink-0 z-20">
-          {/* Left: Active Session Title (No Duplicate Logo here) */}
-          <div className="flex items-center gap-2.5 truncate min-w-0 max-w-[200px] sm:max-w-xs">
+        {/* Top Navbar Header (Modern, Sleek, Spacious VibeCoder Layout) */}
+        <header className="px-4 sm:px-6 py-2.5 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md flex items-center justify-between gap-3 shrink-0 z-20">
+          {/* Left: Active Session Title */}
+          <div className="flex items-center gap-2.5 truncate min-w-0 max-w-[220px] sm:max-w-xs">
             <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse shrink-0" />
             <h1 className="text-xs sm:text-sm font-semibold text-slate-200 tracking-tight truncate">
               {getCurrentTitle()}
             </h1>
           </div>
 
-          {/* Center: Live App Preview & Resource Badges (Prominently in the middle) */}
-          <div className="hidden md:flex items-center gap-3">
-            {/* Live App Preview Pill -> Klik memunculkan modal pemilih aplikasi ala VibeCoder */}
+          {/* Center: Clean Sleek Subdomain Link (1:1 with VibeCoder Design) */}
+          <div className="hidden md:flex items-center">
             <button
               type="button"
               onClick={() => setShowAppChooserModal(true)}
-              title="Pilih dan Cek Aplikasi Live Anda"
-              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 hover:border-violet-500/50 text-slate-200 hover:text-white transition-all shadow-sm group font-mono text-[11px] cursor-pointer"
+              title="Pilih dan Buka Aplikasi Live Anda"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/60 hover:bg-slate-800/90 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white transition-all group font-mono text-xs cursor-pointer shadow-sm"
             >
-              <Zap className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-              <span className="font-semibold text-slate-200 group-hover:text-amber-300">
+              <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-amber-400 transition-colors" />
+              <span className="text-slate-300 group-hover:text-amber-300 transition-colors font-medium">
                 {user?.subdomain || user?.username || 'demo'}.kilatstools.my.id
               </span>
-              <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-sans uppercase font-bold tracking-wider">
-                LIVE APP {userApps.length > 0 ? `(${userApps.length})` : ''}
-              </span>
+              {userApps.length > 0 && (
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/80 font-sans font-bold tracking-wider ml-1">
+                  LIVE ({userApps.length})
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* Right: Resources, Tools & Account Menu */}
+          <div className="flex items-center gap-2 sm:gap-2.5 ml-auto md:ml-0 text-xs font-medium shrink-0">
+            {/* Mobile Link */}
+            <button
+              type="button"
+              onClick={() => setShowAppChooserModal(true)}
+              className="md:hidden flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-[11px] font-mono text-slate-200"
+            >
+              <ExternalLink className="w-3 h-3 text-amber-400" />
+              <span>Live ({userApps.length})</span>
             </button>
 
-            {/* Combined Resource Badges */}
-            <div className="flex items-center bg-slate-900/90 border border-slate-800/80 rounded-xl p-0.5 shadow-inner">
+            {/* Combined Resource Capsule */}
+            <div className="flex items-center bg-slate-900/90 border border-slate-800 rounded-xl p-0.5 shadow-inner">
               <Link
                 href="/billing"
                 title="Kredit Slot Aplikasi"
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg hover:bg-slate-800 text-amber-300 text-[11px] font-semibold transition-colors"
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg hover:bg-slate-800 text-amber-300 text-[11px] font-semibold transition-colors"
               >
                 <span>🗂</span>
                 <span className="text-slate-400 font-normal">App:</span>
@@ -472,46 +486,37 @@ export default function DashboardLayout({
               <Link
                 href="/billing"
                 title="Kredit Token AI"
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg hover:bg-slate-800 text-yellow-300 text-[11px] font-semibold transition-colors"
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg hover:bg-slate-800 text-yellow-300 text-[11px] font-semibold transition-colors"
               >
                 <Zap className="w-3 h-3 text-amber-400 fill-amber-400" />
                 <span className="text-slate-400 font-normal">AI:</span>
                 <span>{user?.ai_credits ? Math.round(user.ai_credits / 1000) : 0}k</span>
               </Link>
             </div>
-          </div>
 
-          {/* Right: Quick Nav & Actions (Comfortably spaced on the right) */}
-          <div className="flex items-center gap-2 sm:gap-2.5 ml-auto md:ml-0 text-xs font-medium shrink-0">
-            {/* Mobile Fallback for App Pill */}
-            <button
-              type="button"
-              onClick={() => setShowAppChooserModal(true)}
-              className="md:hidden flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-[11px] font-mono text-slate-200"
+            {/* Navigation Buttons */}
+            <Link
+              href="/domains"
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-[11px] transition-colors ${
+                pathname === '/domains'
+                  ? 'bg-violet-600/20 text-violet-300 border-violet-500/40 font-semibold'
+                  : 'bg-slate-900/70 hover:bg-slate-800 border-slate-800 text-slate-300 hover:text-white'
+              }`}
+              title="Kelola Custom Domain Toko"
             >
-              <Zap className="w-3 h-3 text-amber-400" />
-              <span>Live App {userApps.length > 0 ? `(${userApps.length})` : ''}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setShowAppChooserModal(true)}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-slate-800 bg-slate-900/70 hover:bg-slate-800 text-slate-300 hover:text-white text-[11px] transition-colors cursor-pointer"
-              title="Pilih dan Cek Aplikasi Anda"
-            >
-              <span>🌐</span>
+              <Globe className="w-3.5 h-3.5 text-indigo-400" />
               <span className="hidden sm:inline">Domain</span>
-            </button>
+            </Link>
 
             <Link
               href="/pro"
               className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-[11px] transition-colors ${
                 pathname === '/pro'
-                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 font-semibold'
                   : 'bg-slate-900/70 hover:bg-slate-800 border-slate-800 text-amber-400'
               }`}
             >
-              <Crown className="w-3 h-3 text-amber-400" />
+              <Crown className="w-3.5 h-3.5 text-amber-400" />
               <span className="hidden sm:inline">Pro</span>
             </Link>
 
@@ -530,7 +535,7 @@ export default function DashboardLayout({
               </Link>
             )}
 
-            {/* Status */}
+            {/* Live Status Badge */}
             <div className="hidden sm:flex items-center">
               {isBuilding ? (
                 <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-amber-500/15 text-amber-300 border border-amber-500/30">
@@ -545,8 +550,8 @@ export default function DashboardLayout({
               )}
             </div>
 
-            {/* Group 4: Account Actions with Divider */}
-            <div className="flex items-center gap-1.5 pl-2.5 border-l border-slate-800">
+            {/* User Quick Actions */}
+            <div className="flex items-center gap-1.5 pl-2 border-l border-slate-800">
               <Link
                 href="/account"
                 title="Pengaturan Akun & Mutasi"
@@ -557,16 +562,15 @@ export default function DashboardLayout({
                 }`}
               >
                 <Settings className="w-3.5 h-3.5 text-slate-400" />
-                <span className="hidden md:inline">Pengaturan</span>
+                <span className="hidden lg:inline">Pengaturan</span>
               </Link>
 
               <button
                 onClick={handleLogout}
                 title="Keluar dari akun"
-                className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-slate-900/70 hover:bg-rose-500/10 hover:text-rose-300 border border-slate-800 text-slate-400 text-[11px] transition-colors flex items-center gap-1"
+                className="p-1.5 sm:px-2 sm:py-1.5 rounded-xl bg-slate-900/70 hover:bg-rose-500/10 hover:text-rose-300 border border-slate-800 text-slate-400 text-[11px] transition-colors flex items-center gap-1"
               >
                 <LogOut className="w-3.5 h-3.5" />
-                <span className="hidden md:inline">Keluar</span>
               </button>
             </div>
           </div>

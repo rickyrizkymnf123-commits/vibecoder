@@ -1072,13 +1072,13 @@ export default function AdminPage() {
   let deployedApp: GeneratedApp | undefined;
   const baseUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
     ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-    : (process.env.NEXT_PUBLIC_APP_URL || 'https://forge.dev');
+    : (process.env.NEXT_PUBLIC_APP_URL || 'https://www.kilatstools.my.id');
   let publicUrl = `${baseUrl}/preview/${slug}`;
 
   if (hasAppCredit) {
     const vercel = new VercelClient();
     const deployResult = await vercel.deploy(appName, files, userSubdomain);
-    const baseDomain = process.env.BASE_DOMAIN || 'forge.dev';
+    const baseDomain = process.env.BASE_DOMAIN || 'kilatstools.my.id';
     publicUrl = deployResult.publicUrl || `https://${userSubdomain}.${baseDomain}/${slug}`;
 
     await recordToolCall('deploy_vercel', 'Deploy aplikasi live & aktifkan Interactive Live Preview', {

@@ -112,7 +112,7 @@ export default function LandingPage() {
               </div>
               <h3 className="text-xl font-bold text-white mb-2">Vercel REST Auto-Deploy</h3>
               <p className="text-sm text-slate-400 leading-relaxed">
-                Aplikasi di-deploy langsung ke infrastruktur serverless Vercel. Pengguna mendapatkan URL pribadi format <code className="text-violet-300">username.forge.dev/slug</code> dan dukungan Custom Domain.
+                Aplikasi di-deploy langsung ke infrastruktur serverless Vercel. Pengguna mendapatkan URL pribadi format <code className="text-violet-300">username.kilatstools.my.id/slug</code> dan dukungan Custom Domain.
               </p>
             </div>
 
@@ -203,7 +203,7 @@ export default function LandingPage() {
                     <CheckCircle2 className="w-4 h-4 text-emerald-400" /> 50.000 Kuota Kredit AI
                   </li>
                   <li className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Subdomain Pribadi <code className="text-violet-300 text-xs">user.forge.dev</code>
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Subdomain Pribadi <code className="text-violet-300 text-xs">user.kilatstools.my.id</code>
                   </li>
                   <li className="flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400" /> 16 In-Process E2E Test Suite
