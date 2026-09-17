@@ -12,7 +12,8 @@ import {
   Check,
   RefreshCw,
   ArrowLeft,
-  Server
+  Server,
+  Trash2
 } from 'lucide-react';
 import { GeneratedApp } from '@/lib/types';
 
@@ -24,6 +25,7 @@ export default function CustomDomainsPage() {
   const [assigning, setAssigning] = useState(false);
   const [dnsInstructions, setDnsInstructions] = useState<any>(null);
   const [checkStatusLoading, setCheckStatusLoading] = useState(false);
+  const [deletingAppId, setDeletingAppId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -95,6 +97,34 @@ export default function CustomDomainsPage() {
       alert('Gagal mengecek status DNS');
     } finally {
       setCheckStatusLoading(false);
+    }
+  };
+
+  const handleDeleteDomain = async (app: GeneratedApp) => {
+    if (!app.custom_domain) return;
+    const confirmDelete = window.confirm(
+      `Yakin ingin menghapus custom domain "${app.custom_domain}" dari aplikasi ${app.name}?`
+    );
+    if (!confirmDelete) return;
+
+    setDeletingAppId(app.id);
+    try {
+      const res = await fetch('/api/deploy/domain', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appId: app.id })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        alert(`Custom domain "${app.custom_domain}" berhasil dihapus.`);
+        fetchApps();
+      } else {
+        alert(data.error || 'Gagal menghapus custom domain');
+      }
+    } catch {
+      alert('Terjadi kesalahan saat menghapus custom domain');
+    } finally {
+      setDeletingAppId(null);
     }
   };
 
@@ -365,7 +395,7 @@ export default function CustomDomainsPage() {
               <thead className="bg-slate-950 text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-800">
                 <tr>
                   <th className="px-5 py-3">Nama Aplikasi</th>
-                  <th className="px-5 py-3">Subdomain Forge</th>
+                  <th className="px-5 py-3">Subdomain Kilat Tools</th>
                   <th className="px-5 py-3">Custom Domain</th>
                   <th className="px-5 py-3">Status DNS</th>
                   <th className="px-5 py-3 text-right">Aksi</th>
@@ -389,7 +419,7 @@ export default function CustomDomainsPage() {
                           href={`https://${app.custom_domain}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="hover:underline flex items-center gap-1"
+                          className="hover:underline flex items-center gap-1 font-semibold"
                         >
                           {app.custom_domain} <ExternalLink className="w-3 h-3" />
                         </a>
@@ -407,15 +437,35 @@ export default function CustomDomainsPage() {
                       )}
                     </td>
                     <td className="px-5 py-3.5 text-right">
-                      {app.custom_domain && (
-                        <button
-                          onClick={() => handleVerifyDns(app.custom_domain!)}
-                          disabled={checkStatusLoading}
-                          className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium transition-colors inline-flex items-center gap-1"
-                        >
-                          <RefreshCw className={`w-3 h-3 ${checkStatusLoading ? 'animate-spin' : ''}`} />
-                          Cek DNS
-                        </button>
+                      {app.custom_domain ? (
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleVerifyDns(app.custom_domain!)}
+                            disabled={checkStatusLoading}
+                            title="Cek Verifikasi DNS"
+                            className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[11px] font-medium transition-colors inline-flex items-center gap-1 border border-slate-700"
+                          >
+                            <RefreshCw className={`w-3 h-3 ${checkStatusLoading ? 'animate-spin' : ''}`} />
+                            <span>Cek DNS</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteDomain(app)}
+                            disabled={deletingAppId === app.id}
+                            title="Hapus / Putuskan Custom Domain"
+                            className="px-2.5 py-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 hover:text-rose-200 border border-rose-800/50 text-[11px] font-medium transition-colors inline-flex items-center gap-1"
+                          >
+                            {deletingAppId === app.id ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-3 h-3" />
+                            )}
+                            <span>Hapus</span>
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-slate-600 text-[11px]">-</span>
                       )}
                     </td>
                   </tr>

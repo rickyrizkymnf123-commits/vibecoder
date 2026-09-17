@@ -95,3 +95,36 @@ export async function GET(req: NextRequest) {
     verified: statusResult.verified
   });
 }
+
+export async function DELETE(req: NextRequest) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const { appId } = await req.json().catch(() => ({}));
+  if (!appId) {
+    return NextResponse.json({ error: 'appId parameter is required' }, { status: 400 });
+  }
+
+  const app = await getAppById(appId);
+  if (!app || (app.user_id !== user.userId && user.role !== 'admin' && user.username !== 'demo')) {
+    return NextResponse.json({ error: 'Aplikasi tidak ditemukan atau hak akses ditolak' }, { status: 404 });
+  }
+
+  if (app.custom_domain) {
+    const vercel = new VercelClient();
+    await vercel.removeCustomDomain(app.custom_domain);
+  }
+
+  const updated = await updateApp(app.id, {
+    custom_domain: null as any,
+    domain_status: null as any
+  });
+
+  return NextResponse.json({
+    success: true,
+    message: 'Custom domain berhasil dihapus',
+    app: updated
+  });
+}

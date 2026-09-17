@@ -169,4 +169,29 @@ export class VercelClient {
       return { verified: false, status: 'error' };
     }
   }
+
+  async removeCustomDomain(domain: string): Promise<{ success: boolean; error?: string }> {
+    const projectId = process.env.VERCEL_PROJECT_ID || 'prj_CPiv8zjHnSqrA1Q1wbqJxki43iZp';
+
+    if (!this.token) {
+      return { success: true };
+    }
+
+    try {
+      const res = await fetch(`https://api.vercel.com/v9/projects/${projectId}/domains/${encodeURIComponent(domain)}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${this.token}` }
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        console.warn('Vercel delete domain error:', errData);
+      }
+
+      return { success: true };
+    } catch (err: any) {
+      console.error('Vercel remove domain exception:', err);
+      return { success: false, error: err.message };
+    }
+  }
 }
