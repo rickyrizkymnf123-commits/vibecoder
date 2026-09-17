@@ -104,13 +104,33 @@ export class VercelClient {
     }
   }
 
-  async assignCustomDomain(appName: string, domain: string): Promise<{ success: boolean; verificationRecord: string; status: string }> {
+  async assignCustomDomain(appName: string, domain: string): Promise<{
+    success: boolean;
+    verified: boolean;
+    domain: string;
+    txtRecord: { type: string; host: string; fqdn: string; value: string };
+    aRecord: { type: string; host: string; value: string };
+    status: 'pending_verification' | 'verified' | 'failed';
+    rawData?: any;
+  }> {
     const projectId = process.env.VERCEL_PROJECT_ID || 'prj_CPiv8zjHnSqrA1Q1wbqJxki43iZp';
     
     if (!this.token) {
       return {
         success: true,
-        verificationRecord: 'cname.vercel-dns.com',
+        verified: false,
+        domain,
+        txtRecord: {
+          type: 'TXT',
+          host: '_vercel',
+          fqdn: `_vercel.${domain}`,
+          value: `vc-domain-verify=${domain}`
+        },
+        aRecord: {
+          type: 'A',
+          host: '@',
+          value: '76.76.21.21'
+        },
         status: 'pending_verification'
       };
     }
@@ -126,28 +146,105 @@ export class VercelClient {
       });
 
       const data = await res.json();
-      const isVerified = data.verified || false;
+      const isVerified = Boolean(data.verified);
+
+      // Extract TXT Challenge from Vercel verification array
+      let txtRecord = {
+        type: 'TXT',
+        host: '_vercel',
+        fqdn: `_vercel.${domain}`,
+        value: `vc-domain-verify=${domain}`
+      };
+
+      if (Array.isArray(data.verification) && data.verification.length > 0) {
+        const txtItem = data.verification.find((v: any) => v.type === 'TXT') || data.verification[0];
+        if (txtItem) {
+          const hostPart = txtItem.domain
+            ? txtItem.domain.replace(new RegExp(`\\.?${domain}$`), '') || '_vercel'
+            : '_vercel';
+          txtRecord = {
+            type: 'TXT',
+            host: hostPart,
+            fqdn: txtItem.domain || `_vercel.${domain}`,
+            value: txtItem.value || `vc-domain-verify=${domain}`
+          };
+        }
+      }
 
       return {
         success: true,
-        verificationRecord: 'cname.vercel-dns.com',
-        status: isVerified ? 'active' : 'pending_verification'
+        verified: isVerified,
+        domain,
+        txtRecord,
+        aRecord: {
+          type: 'A',
+          host: '@',
+          value: '76.76.21.21'
+        },
+        status: isVerified ? 'verified' : 'pending_verification',
+        rawData: data
       };
-    } catch (err) {
+    } catch (err: any) {
       console.warn('Vercel assign custom domain API exception:', err);
       return {
         success: true,
-        verificationRecord: 'cname.vercel-dns.com',
+        verified: false,
+        domain,
+        txtRecord: {
+          type: 'TXT',
+          host: '_vercel',
+          fqdn: `_vercel.${domain}`,
+          value: `vc-domain-verify=${domain}`
+        },
+        aRecord: {
+          type: 'A',
+          host: '@',
+          value: '76.76.21.21'
+        },
         status: 'pending_verification'
       };
     }
   }
 
-  async checkDomainStatus(domain: string): Promise<{ verified: boolean; status: string }> {
+  /**
+   * TAHAP 2: Trigger verify endpoint on Vercel to actively check TXT + A records
+   */
+  async verifyDomain(domain: string): Promise<{ success: boolean; verified: boolean; error?: string; rawData?: any }> {
     const projectId = process.env.VERCEL_PROJECT_ID || 'prj_CPiv8zjHnSqrA1Q1wbqJxki43iZp';
 
     if (!this.token) {
-      return { verified: true, status: 'active' };
+      return { success: true, verified: true };
+    }
+
+    try {
+      const res = await fetch(`https://api.vercel.com/v9/projects/${projectId}/domains/${encodeURIComponent(domain)}/verify`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await res.json();
+      const isVerified = Boolean(data.verified);
+
+      return {
+        success: res.ok || isVerified,
+        verified: isVerified,
+        error: data.error?.message,
+        rawData: data
+      };
+    } catch (err: any) {
+      console.error('Vercel verify domain exception:', err);
+      return { success: false, verified: false, error: err.message };
+    }
+  }
+
+  async checkDomainStatus(domain: string): Promise<{ verified: boolean; status: string; verification?: any[] }> {
+    const projectId = process.env.VERCEL_PROJECT_ID || 'prj_CPiv8zjHnSqrA1Q1wbqJxki43iZp';
+
+    if (!this.token) {
+      return { verified: true, status: 'verified' };
     }
 
     try {
@@ -160,9 +257,11 @@ export class VercelClient {
       }
 
       const data = await res.json();
+      const isVerified = Boolean(data.verified);
       return {
-        verified: data.verified || false,
-        status: data.verified ? 'active' : 'pending_verification'
+        verified: isVerified,
+        status: isVerified ? 'verified' : 'pending_verification',
+        verification: data.verification
       };
     } catch (err) {
       console.error('Vercel check domain status exception:', err);

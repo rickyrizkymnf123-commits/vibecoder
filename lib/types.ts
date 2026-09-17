@@ -63,7 +63,10 @@ export interface GeneratedApp {
   vercel_id?: string | null;
   vercel_url?: string | null;
   custom_domain?: string | null;
-  domain_status?: 'pending_verification' | 'active' | 'failed' | null;
+  domain_status?: 'pending_verification' | 'verified' | 'failed' | null;
+  txt_verification_name?: string | null;
+  txt_verification_value?: string | null;
+  verified_at?: string | null;
   files: Record<string, string>; // filepath -> content
   db_schema_name?: string | null;
   published_at?: string | null;
