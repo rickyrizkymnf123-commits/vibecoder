@@ -57,6 +57,7 @@ create table if not exists public.apps (
   vercel_url text,
   custom_domain text,
   domain_status text,
+  domain_verification jsonb,
   files jsonb default '{}'::jsonb not null,
   db_schema_name text,
   published_at timestamptz,

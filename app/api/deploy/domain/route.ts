@@ -69,14 +69,28 @@ export async function POST(req: NextRequest) {
   const vercel = new VercelClient();
   const assignResult = await vercel.assignCustomDomain(app.name, cleanDomain);
 
+  const domainVerificationData = {
+    txt_name: assignResult.txtRecord?.host || '_vercel',
+    txt_value: assignResult.txtRecord?.value || `vc-domain-verify=${cleanDomain}`,
+    a_name: assignResult.aRecord?.host || '@',
+    a_value: assignResult.aRecord?.value || '76.76.21.21',
+    verified_at: assignResult.verified ? new Date().toISOString() : null,
+    raw: assignResult.rawData || null
+  };
+
   // 5. Simpan challenge dan data verifikasi ke Supabase DB
   const updated = await updateApp(app.id, {
     custom_domain: cleanDomain,
     domain_status: assignResult.verified ? 'verified' : 'pending_verification',
-    txt_verification_name: assignResult.txtRecord?.host || '_vercel',
-    txt_verification_value: assignResult.txtRecord?.value || `vc-domain-verify=${cleanDomain}`,
-    verified_at: assignResult.verified ? new Date().toISOString() : (null as any)
+    domain_verification: domainVerificationData
   });
+
+  if (!updated) {
+    return NextResponse.json(
+      { error: 'Gagal menyimpan konfigurasi domain ke database' },
+      { status: 500 }
+    );
+  }
 
   return NextResponse.json({
     success: true,
@@ -120,9 +134,18 @@ export async function GET(req: NextRequest) {
 
     let updatedApp = targetApp;
     if (targetApp) {
+      const existingVerif = targetApp.domain_verification || {
+        txt_name: '_vercel',
+        txt_value: `vc-domain-verify=${targetDomain}`,
+        a_name: '@',
+        a_value: '76.76.21.21'
+      };
       updatedApp = await updateApp(targetApp.id, {
         domain_status: newStatus,
-        verified_at: verifyResult.verified ? new Date().toISOString() : (null as any)
+        domain_verification: {
+          ...existingVerif,
+          verified_at: verifyResult.verified ? new Date().toISOString() : null
+        }
       });
     }
 
@@ -141,8 +164,7 @@ export async function GET(req: NextRequest) {
 
   if (targetApp && targetApp.domain_status !== currentStatus) {
     targetApp = await updateApp(targetApp.id, {
-      domain_status: currentStatus,
-      verified_at: statusResult.verified ? new Date().toISOString() : (null as any)
+      domain_status: currentStatus
     });
   }
 
@@ -181,9 +203,7 @@ export async function DELETE(req: NextRequest) {
   const updated = await updateApp(app.id, {
     custom_domain: null as any,
     domain_status: null as any,
-    txt_verification_name: null as any,
-    txt_verification_value: null as any,
-    verified_at: null as any
+    domain_verification: null as any
   });
 
   return NextResponse.json({

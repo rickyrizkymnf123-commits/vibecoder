@@ -64,6 +64,14 @@ export interface GeneratedApp {
   vercel_url?: string | null;
   custom_domain?: string | null;
   domain_status?: 'pending_verification' | 'verified' | 'failed' | null;
+  domain_verification?: {
+    txt_name: string;
+    txt_value: string;
+    a_name: string;
+    a_value: string;
+    verified_at?: string | null;
+    raw?: any;
+  } | null;
   txt_verification_name?: string | null;
   txt_verification_value?: string | null;
   verified_at?: string | null;
