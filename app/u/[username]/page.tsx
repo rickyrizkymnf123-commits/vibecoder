@@ -158,7 +158,9 @@ export default async function UserSubdomainDirectoryPage({ params }: Props) {
                     Runtime: Node.js / React
                   </span>
                   <a
-                    href={`/preview/${app.slug}`}
+                    href={app.custom_domain ? `https://${app.custom_domain}` : `https://${username}.kilatstools.my.id/${app.slug}`}
+                    target="_blank"
+                    rel="noreferrer"
                     className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold transition-all shadow-md shadow-violet-600/20"
                   >
                     <span>Buka App</span>

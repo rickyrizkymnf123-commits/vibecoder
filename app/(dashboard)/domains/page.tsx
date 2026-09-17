@@ -173,7 +173,7 @@ export default function CustomDomainsPage() {
 
                 <div className="flex items-center gap-2 pt-2 border-t border-slate-900">
                   <a
-                    href={`/preview/${app.slug}`}
+                    href={app.custom_domain ? `https://${app.custom_domain}` : `https://rickyrizky.kilatstools.my.id/${app.slug}`}
                     target="_blank"
                     rel="noreferrer"
                     className="flex-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold text-center transition-colors flex items-center justify-center gap-1.5 shadow-sm"

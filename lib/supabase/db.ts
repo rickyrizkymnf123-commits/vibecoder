@@ -659,6 +659,25 @@ export async function getAppBySlug(slug: string): Promise<GeneratedApp | null> {
   }
 }
 
+export async function getAppByCustomDomain(domain: string): Promise<GeneratedApp | null> {
+  try {
+    const clean = domain.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '');
+    const { data, error } = await supabaseAdmin
+      .from('apps')
+      .select('*')
+      .eq('custom_domain', clean)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return data as GeneratedApp;
+  } catch (err) {
+    console.error('Failed to getAppByCustomDomain:', err);
+    return null;
+  }
+}
+
 export async function getAppById(appId: string): Promise<GeneratedApp | null> {
   try {
     const { data, error } = await supabaseAdmin

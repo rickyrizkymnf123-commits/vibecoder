@@ -885,13 +885,17 @@ export default function ChatSessionPage() {
                 {deployedApp.status === 'published' ? (
                   <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-xs">
                     <span className="font-mono text-emerald-400 truncate">
-                      {deployedApp.vercel_url || `/preview/${deployedApp.slug}`}
+                      {deployedApp.custom_domain
+                        ? `https://${deployedApp.custom_domain}`
+                        : `https://${(deployedApp as any).user_subdomain || 'user'}.kilatstools.my.id/${deployedApp.slug}`}
                     </span>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 shrink-0">
                       <button
                         onClick={() =>
                           copyAppUrl(
-                            deployedApp.vercel_url || `/preview/${deployedApp.slug}`
+                            deployedApp.custom_domain
+                              ? `https://${deployedApp.custom_domain}`
+                              : `https://${(deployedApp as any).user_subdomain || 'user'}.kilatstools.my.id/${deployedApp.slug}`
                           )
                         }
                         className="px-2 py-1 rounded bg-slate-900 hover:bg-slate-800 text-slate-300 text-[11px] flex items-center gap-1 transition-colors"
@@ -901,7 +905,9 @@ export default function ChatSessionPage() {
                       </button>
                       <a
                         href={
-                          deployedApp.vercel_url || `/preview/${deployedApp.slug}`
+                          deployedApp.custom_domain
+                            ? `https://${deployedApp.custom_domain}`
+                            : `https://${(deployedApp as any).user_subdomain || 'user'}.kilatstools.my.id/${deployedApp.slug}`
                         }
                         target="_blank"
                         rel="noreferrer"

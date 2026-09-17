@@ -654,7 +654,7 @@ export default function DashboardLayout({
                       {/* Action Buttons */}
                       <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-800">
                         <a
-                          href={`/preview/${app.slug}`}
+                          href={app.custom_domain ? `https://${app.custom_domain}` : `https://${user?.subdomain || user?.username || 'demo'}.kilatstools.my.id/${app.slug}`}
                           target="_blank"
                           rel="noreferrer"
                           onClick={() => setShowAppChooserModal(false)}

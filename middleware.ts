@@ -45,20 +45,20 @@ export async function middleware(req: NextRequest) {
       return NextResponse.rewrite(new URL(`/u/${subdomain}`, req.url));
     }
 
-    // B. App path directly under subdomain (e.g. https://rickyrizky.kilatstools.my.id/gudangku-inventori-stok)
-    if (!url.pathname.startsWith('/preview') && !url.pathname.startsWith('/api') && !url.pathname.startsWith('/u/')) {
-      const slug = url.pathname.replace(/^\//, '');
-      return NextResponse.rewrite(new URL(`/preview/${slug}`, req.url));
+    // B. Direct App path under subdomain (e.g. https://rickyrizky.kilatstools.my.id/gudangku-inventori-stok)
+    // Directly serves the standalone app without '/preview/' in the browser URL
+    if (!url.pathname.startsWith('/api') && !url.pathname.startsWith('/u/')) {
+      const slug = url.pathname.replace(/^\//, '').replace(/\/$/, '');
+      return NextResponse.rewrite(new URL(`/api/preview/${slug}/raw`, req.url));
     }
 
     return NextResponse.next();
   }
 
   // 3. Custom Domain (e.g. kasir.tokoberkah.com)
-  // Rewrite root directly to preview handler or custom domain runtime
-  if (url.pathname === '/' || url.pathname === '') {
-    // If it's a custom domain, rewrite to preview lookup
-    return NextResponse.rewrite(new URL(`/preview/custom-domain-runtime?domain=${hostname}`, req.url));
+  // Directly serves the raw app associated with that custom domain
+  if (!url.pathname.startsWith('/api')) {
+    return NextResponse.rewrite(new URL(`/api/preview/custom-domain-runtime?domain=${hostname}`, req.url));
   }
 
   return NextResponse.next();
