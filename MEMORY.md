@@ -373,24 +373,29 @@
   - Terverifikasi 100% aktif dan berjalan di Vercel Production (`https://forge-app-engine.vercel.app`) via Puppeteer E2E test.
   - Dev server aktif di `http://localhost:3006` (Status 200 OK).
 
-### 16. Integrasi Domain Resmi (kilatstools.my.id) & Edge Middleware Multi-Tenant
-- **Domain Resmi Platform**:
-  - `https://www.kilatstools.my.id` (Platform Studio & Landing Page - Verified HTTP 200 OK).
-  - Wildcard Subdomain `*.kilatstools.my.id` terdaftar di project Vercel `forge` (`prj_CPiv8zjHnSqrA1Q1wbqJxki43iZp`).
-- **Next.js Edge Middleware Multi-Tenant Routing (`middleware.ts`)**:
-  - Host-based automatic dynamic routing:
-    - Root / Main domain (`kilatstools.my.id`, `www.kilatstools.my.id`, `localhost`, `vercel.app`) -> Pass through ke platform landing page & studio.
-    - Subdomain root (`https://{username}.kilatstools.my.id/`) -> Rewrite ke halaman direktori profil kreator `/u/{username}`.
-    - Subdomain app path (`https://{username}.kilatstools.my.id/{slug}`) -> Rewrite langsung ke interactive preview `/preview/{slug}`.
-    - Toko / Client Custom Domain (misal `kasir.tokoberkah.com`) -> Rewrite ke live application runtime.
-- **Halaman Publik Direktori Subdomain (`app/u/[username]/page.tsx`)**:
-  - Menyajikan halaman publik responsif yang menampilkan:
-    - Profil kreator & badge status Pro.
-    - Judul *"Aplikasi Publik {username}"*.
-    - Grid kartu seluruh aplikasi aktif milik user lengkap dengan tombol akses langsung `[Buka App ↗]`.
-- **Vercel Dynamic Custom Domain API (`lib/vercel/client.ts`)**:
-  - Menghubungkan form custom domain di `/domains` langsung ke Vercel REST API untuk registrasi domain klien dan verifikasi DNS record secara real-time.
-- **Status Deploy & Repository**:
-  - GitHub: Remote `main` tersinkronisasi 100% (`https://github.com/rickyrizkymnf123-commits/vibecoder.git`).
-  - Vercel: Production build `dpl_8KxVCKW4dR4R2rLtYn2CX2YxAsCN` READY dan aliased ke `https://*.kilatstools.my.id`.
-  - Local Dev Server: Aktif di `http://localhost:3006` (CSS & Routes HTTP 200 OK).
+### 17. Implementasi 2-Tahap Verifikasi Custom Domain (TXT Ownership Challenge + A Record Routing)
+- **Arsitektur Custom Domain ala Lovable & Emergent**:
+  - **Granularitas Per-App**: 1 Custom Root Domain (misal `tokoku.com`) menghubungkan tepat 1 aplikasi berstatus `published`.
+  - **Pro Tier Guard**: Hanya pengguna Pro (`is_pro = true`), Super Admin, atau akun demo yang diizinkan menambahkan custom domain. Pengguna non-Pro disajikan banner upsell yang mengarahkan ke `/pro` atau `/billing`.
+- **Tahap 1 (Registrasi & Ekstraksi Challenge DNS)**:
+  - Backend memanggil Vercel Domains API: `POST https://api.vercel.com/v10/projects/{projectId}/domains` dengan `{ name: domain }`.
+  - Ekstraksi `verification` challenge dari respon Vercel (Record 1 TXT Host: `_vercel`, Value: `vc-domain-verify=...`).
+  - Database Postgres Supabase menyimpan data verifikasi: `txt_verification_name`, `txt_verification_value`, dan `domain_status: 'pending_verification'`.
+  - UI menyajikan 2 Kartu DNS Record dengan tombol salin instan:
+    1. **Record 1 (Bukti Kepemilikan)**: Tipe `TXT`, Host `_vercel`, Value `vc-domain-verify=...`.
+    2. **Record 2 (Arahkan Trafik)**: Tipe `A`, Host `@`, Value `76.76.21.21`.
+- **Tahap 2 (Verifikasi Nyata & Indikator Status 3-Warna)**:
+  - Tombol `[⟳ Cek Status Verifikasi]` memanggil endpoint `POST https://api.vercel.com/v9/projects/{projectId}/domains/{domain}/verify`.
+  - Status indikator dinamis:
+    - 🟡 Kuning (`pending_verification`): *"Menunggu DNS (1-15 Menit)"*
+    - 🟢 Hijau (`verified`): *"Aktif & Terverifikasi"* (SSL Otomatis)
+    - 🔴 Merah (`failed`): *"Verifikasi Gagal — Cek Record"*
+- **Pemutusan Domain**:
+  - Tombol `[🗑 Putuskan Domain]` memanggil `DELETE https://api.vercel.com/v9/projects/{projectId}/domains/{domain}` dan membersihkan kolom custom domain di database Supabase.
+- **Verifikasi & Build**:
+  - TypeScript `npx tsc --noEmit`: 0 error.
+  - Next.js Production Build: 34/34 routes sukses dikompilasi.
+  - Vercel Production Deploy: Deployment `dpl_CDPiM9JT9gudRM2tKhTQJ36b4Uw1` aktif di `https://*.kilatstools.my.id`.
+  - GitHub Remote: Branch `main` sinkron 100%.
+  - Local Dev Server: Aktif di `http://localhost:3006`.
+

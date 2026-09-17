@@ -1,5 +1,22 @@
 # Conversation Log — VibeCoder Platform
 
+## [2026-09-17] Implementasi 2-Tahap Verifikasi Custom Domain (TXT Ownership + A Record Traffic)
+1. **Spesifikasi & Arsitektur (Ala Lovable & Emergent)**:
+   - User memasukkan root domain (e.g. `tokoku.com`) per 1 aplikasi ter-publish.
+   - Pro Tier Guard: Validasi `is_pro` ketat di server backend (`/api/deploy/domain`) dan client UI (`/domains`), pengguna gratis melihat kartu upsell ke `/pro`.
+2. **Tahap 1 (Registrasi & 2 DNS Record)**:
+   - `POST https://api.vercel.com/v10/projects/{projectId}/domains` mendaftarkan domain dan mengambil verification TXT challenge.
+   - DB Supabase menyimpan `txt_verification_name` (`_vercel`) dan `txt_verification_value` (`vc-domain-verify=...`).
+   - UI menampilkan 2 kartu: Record 1 (TXT Kepemilikan) dan Record 2 (A Record Routing `76.76.21.21`) dengan tombol salin.
+3. **Tahap 2 (Verifikasi Nyata & 3 Indikator Status)**:
+   - Tombol `[⟳ Cek Status Verifikasi]` memanggil endpoint `POST /v9/projects/{projectId}/domains/{domain}/verify`.
+   - Indikator 3 Status: 🟡 *Menunggu DNS* (`pending_verification`), 🟢 *Aktif & Terverifikasi* (`verified`), 🔴 *Verifikasi Gagal* (`failed`).
+4. **Pemutusan Domain**:
+   - Tombol `[🗑 Putuskan Domain]` memanggil `DELETE /v9/projects/{projectId}/domains/{domain}` dan membersihkan DB.
+5. **Kompilasi & Deployment**:
+   - TypeScript `npx tsc --noEmit` 0 error, Next.js Build 34/34 routes lulus, Vercel Production terdeploy dan aliased ke `https://*.kilatstools.my.id`, GitHub branch `main` sinkron.
+
+
 ## [2026-09-09] Inisiasi & Pembangunan Platform Forge / VibeCoder Full Scope
 
 ### 1. Inisialisasi Proyek & Konfigurasi
