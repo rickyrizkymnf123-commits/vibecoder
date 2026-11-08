@@ -17,6 +17,7 @@ import {
   executeBrowserTest,
   executePublishApp,
   getWorkspaceDir,
+  resolveSafePath,
   collectAllFiles
 } from './executor';
 import { ToolCallItem, TodoItem, GeneratedApp } from '../types';
@@ -837,12 +838,25 @@ Lakukan perubahan secara langsung pada berkas target (misal public/css/style.css
       resultOutput = { success: true, count: todoList.length };
       await recordToolFinish(tc, resultOutput);
     } else if (name === 'write_file') {
-      const tc = await recordToolStart('write_file', `Menulis berkas: ${args.path}`, {
+      const isAppend = args.append === true || args.append === 'true';
+      const tc = await recordToolStart('write_file', `${isAppend ? 'Melanjutkan berkas' : 'Menulis berkas'}: ${args.path}`, {
         path: args.path,
         content: args.content || '',
-        bytes: args.content?.length || 0
+        bytes: args.content?.length || 0,
+        append: isAppend
       });
-      resultOutput = await executeWriteFile(sessionId, args.path, args.content || '');
+      let finalContent = args.content || '';
+      if (isAppend && args.path) {
+        // Mode append: gabungkan dengan isi berkas yang sudah ada (untuk berkas besar yang ditulis bertahap)
+        try {
+          const existingPath = resolveSafePath(wsDir, args.path);
+          if (fs.existsSync(existingPath)) {
+            const prev = fs.readFileSync(existingPath, 'utf8');
+            finalContent = prev + (prev.endsWith('\n') ? '' : '\n') + finalContent;
+          }
+        } catch {}
+      }
+      resultOutput = await executeWriteFile(sessionId, args.path, finalContent);
       if (args.path && !writtenFiles.includes(args.path)) writtenFiles.push(args.path);
       await recordToolFinish(tc, resultOutput);
 
@@ -1101,6 +1115,22 @@ function parseSseResponse(rawText: string): any {
       let lastErrText = '';
       const MAX_RETRIES = 2;
 
+      // Kartu aktivitas: tampilkan bahwa AI sedang bekerja selama menunggu respons (bisa 30-90 detik per langkah).
+      const pendingAssets = writtenFiles.length > 0 ? getMissingReferencedAssets(wsDir) : [];
+      const stepTitle = turn === 1 && !isFollowUp
+        ? 'AI merancang struktur aplikasi & menulis kode awal'
+        : pendingAssets.length > 0
+          ? `AI sedang menulis ${pendingAssets.join(', ')}`
+          : `AI melanjutkan pengerjaan (langkah ${turn})`;
+      const stepStartedAt = Date.now();
+      const stepTc = await recordToolStart('ai_step', stepTitle, { langkah: turn, model: aiConfig.defaultModel });
+      let stepClosed = false;
+      const closeStep = async (status: 'completed' | 'failed', output: any) => {
+        if (stepClosed) return;
+        stepClosed = true;
+        await recordToolFinish(stepTc, { ...output, durasi_detik: Math.round((Date.now() - stepStartedAt) / 1000) }, status);
+      };
+
       for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
           const isTurn1 = turn === 1 && !isFollowUp;
@@ -1117,6 +1147,8 @@ function parseSseResponse(rawText: string): any {
                 : 'auto',
             temperature: 0.2,
             reasoning_effort: 'low',
+            // Tanpa max_tokens router memotong output di ~8.192 token -> tool call berkas besar (app.js) terbuang.
+            max_tokens: 32000,
             stream: false
           };
 
@@ -1163,6 +1195,7 @@ function parseSseResponse(rawText: string): any {
       }
 
       if (!res || !res.ok) {
+        await closeStep('failed', { error: (lastErrText || 'Tidak ada respons dari AI').substring(0, 300) });
         // Fallback: If custom router failed and GEMINI_API_KEY is available, try direct Gemini
         if (geminiApiKey) {
           try {
@@ -1242,11 +1275,13 @@ function parseSseResponse(rawText: string): any {
             data = parseSseResponse(rawText);
           } catch (sseErr: any) {
             const errMsg = `Format respons AI tidak valid JSON: ${jsonErr.message}`;
+            await closeStep('failed', { error: errMsg });
             await onEvent({ type: 'error', message: errMsg, generationMode: 'live-ai' });
             break;
           }
         } else {
           const errMsg = `Format respons AI tidak valid JSON: ${jsonErr.message}`;
+          await closeStep('failed', { error: errMsg });
           await onEvent({ type: 'error', message: errMsg, generationMode: 'live-ai' });
           break;
         }
@@ -1255,11 +1290,45 @@ function parseSseResponse(rawText: string): any {
       const choice = data.choices?.[0];
       if (!choice || !choice.message) {
         const errMsg = 'AI tidak mengembalikan pilihan respons yang valid.';
+        await closeStep('failed', { error: errMsg });
         await onEvent({ type: 'error', message: errMsg, generationMode: 'live-ai' });
         break;
       }
 
       const msg = choice.message;
+
+      // Deteksi output terpotong (batas token): tool call tidak ada / argumennya bukan JSON valid.
+      const finishReason = String(choice.finish_reason || '');
+      const hasBrokenToolArgs = (msg.tool_calls || []).some((tcItem: any) => {
+        try {
+          JSON.parse(tcItem.function?.arguments || '{}');
+          return false;
+        } catch {
+          return true;
+        }
+      });
+      const isTruncated = ['length', 'max_tokens'].includes(finishReason) && (!msg.tool_calls?.length || hasBrokenToolArgs);
+      if (isTruncated) {
+        if (data.usage?.total_tokens) totalTokensUsed += data.usage.total_tokens;
+        await closeStep('failed', {
+          finish_reason: finishReason,
+          info: 'Output AI terpotong karena terlalu panjang. AI diminta menulis berkas secara bertahap.'
+        });
+        const target = getMissingReferencedAssets(wsDir)[0] || 'berkas yang sedang ditulis';
+        messages.push({
+          role: 'user',
+          content: `Respons terakhirmu TERPOTONG karena terlalu panjang sehingga berkas tidak tersimpan. Tulis ulang ${target} secara BERTAHAP: panggil write_file untuk bagian pertama (maksimal 250 baris), lalu panggil write_file lagi dengan append: true untuk bagian-bagian berikutnya sampai selesai. Jangan menulis kode di teks balasan.`
+        });
+        continue;
+      }
+
+      await closeStep('completed', {
+        finish_reason: finishReason || 'stop',
+        token_output: data.usage?.completion_tokens,
+        tindakan: msg.tool_calls?.length
+          ? msg.tool_calls.map((t: any) => t.function?.name).join(', ')
+          : 'balasan teks'
+      });
       messages.push(msg);
 
       if (data.usage?.total_tokens) {

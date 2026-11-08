@@ -979,7 +979,15 @@ export default function ChatSessionPage() {
                       <div className="space-y-2.5 pt-3 border-t border-slate-800/80">
                         <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center justify-between">
                           <span>Daftar Tugas & Checklist ({m.todo_list.filter((t) => t.completed).length}/{m.todo_list.length} Selesai)</span>
-                          <span className="text-emerald-400 font-mono text-[11px]">100% Selesai</span>
+                          {(() => {
+                            const done = m.todo_list.filter((t) => t.completed).length;
+                            const pct = Math.round((done / m.todo_list.length) * 100);
+                            return (
+                              <span className={`font-mono text-[11px] ${pct === 100 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                {pct}% Selesai
+                              </span>
+                            );
+                          })()}
                         </div>
                         <div className="space-y-2 bg-slate-950/70 p-4 rounded-xl border border-slate-800/90 font-sans">
                           {m.todo_list.map((todo, idx) => (
@@ -991,7 +999,11 @@ export default function ChatSessionPage() {
                                   : 'text-slate-200'
                               }`}
                             >
-                              <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" strokeWidth={2.5} />
+                              {todo.completed ? (
+                                <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" strokeWidth={2.5} />
+                              ) : (
+                                <span className="w-4 h-4 shrink-0 mt-0.5 rounded-full border-2 border-slate-600" />
+                              )}
                               <span className="select-text">{formatTodoTitle(todo, idx)}</span>
                             </div>
                           ))}

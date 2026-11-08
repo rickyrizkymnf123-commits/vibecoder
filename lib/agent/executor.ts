@@ -56,7 +56,7 @@ export function getWorkspaceDir(sessionId: string): string {
   return sessionDir;
 }
 
-function resolveSafePath(workspaceDir: string, relPath: string): string {
+export function resolveSafePath(workspaceDir: string, relPath: string): string {
   const normalized = path.normalize(relPath).replace(/^(\.\.[\/\\])+/, '');
   const resolved = path.join(workspaceDir, normalized);
   if (!resolved.startsWith(workspaceDir)) {

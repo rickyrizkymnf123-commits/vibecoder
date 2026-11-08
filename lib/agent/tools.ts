@@ -47,7 +47,11 @@ export const AGENT_TOOLS: GeminiFunctionDeclaration[] = [
         },
         content: {
           type: 'STRING',
-          description: 'Isi lengkap kode sumber yang akan ditulis ke dalam berkas.'
+          description: 'Isi kode sumber yang akan ditulis ke dalam berkas. Maksimal sekitar 250 baris per panggilan.'
+        },
+        append: {
+          type: 'BOOLEAN',
+          description: 'true = tambahkan content ke akhir berkas yang sudah ada. Gunakan untuk menulis berkas besar secara bertahap: panggilan pertama tanpa append, lanjutan dengan append: true.'
         }
       },
       required: ['path', 'content']
@@ -142,7 +146,7 @@ export function getOpenAiTools() {
       type: 'function' as const,
       function: {
         name: 'write_file',
-        description: 'Menulis berkas fisik ke disk workspace proyek. Buat kode nyata, lengkap, dan modular.',
+        description: 'Menulis berkas fisik ke disk workspace proyek. Buat kode nyata, lengkap, dan modular. Output per respons dibatasi ~8.000 token, jadi tulis berkas besar dalam beberapa panggilan (append: true).',
         parameters: {
           type: 'object',
           properties: {
@@ -152,7 +156,11 @@ export function getOpenAiTools() {
             },
             content: {
               type: 'string',
-              description: 'Isi kode sumber berkas lengkap'
+              description: 'Isi kode sumber berkas. Maksimal sekitar 250 baris per panggilan.'
+            },
+            append: {
+              type: 'boolean',
+              description: 'true = tambahkan content ke akhir berkas yang sudah ada. Berkas besar (>250 baris, mis. public/js/app.js) WAJIB ditulis bertahap: bagian pertama tanpa append, bagian berikutnya dengan append: true.'
             }
           },
           required: ['path', 'content']
