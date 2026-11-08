@@ -351,6 +351,40 @@ function getNextStepGuidance(writtenFiles: string[], toolCallsHistory: ToolCallI
   return 'Seluruh berkas inti antarmuka dan logika aplikasi telah selesai dirakit. Sekarang SEGERA panggil tool publish_app untuk menerbitkan aplikasi ke Live Preview!';
 }
 
+/**
+ * Cari berkas lokal (.js/.css) yang dirujuk oleh public/index.html tetapi belum ada di workspace.
+ * Mencegah aplikasi "setengah jadi" (mis. index.html memanggil /js/app.js yang tidak pernah ditulis)
+ * ikut terbit dan tersangkut selamanya di layar loading.
+ */
+function getMissingReferencedAssets(wsDir: string): string[] {
+  const htmlPath = path.join(wsDir, 'public', 'index.html');
+  if (!fs.existsSync(htmlPath)) return ['public/index.html'];
+
+  let html = '';
+  try {
+    html = fs.readFileSync(htmlPath, 'utf8');
+  } catch {
+    return [];
+  }
+
+  const missing = new Set<string>();
+  const re = /<(?:script|link)\b[^>]*?\b(?:src|href)\s*=\s*["']([^"'#?]+)/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html))) {
+    const ref = m[1].trim();
+    if (/^(?:[a-z]+:)?\/\//i.test(ref) || /^(?:data|blob|mailto|tel|javascript):/i.test(ref)) continue;
+    if (!/\.(?:m?js|css)$/i.test(ref)) continue;
+    const rel = ref.replace(/^\.?\/+/, '').replace(/^public\//, '');
+    const exists = [path.join(wsDir, 'public', rel), path.join(wsDir, rel)].some((p) => fs.existsSync(p));
+    if (!exists) missing.add(`public/${rel}`);
+  }
+  return Array.from(missing);
+}
+
+function getMissingAssetsGuidance(missing: string[]): string {
+  return `Aplikasi BELUM lengkap: public/index.html merujuk berkas yang belum dibuat (${missing.join(', ')}). Tanpa berkas ini aplikasi hanya menampilkan layar loading. SEKARANG panggil write_file untuk menulis ${missing[0]} dengan kode lengkap dan fungsional (bukan placeholder), lalu lanjutkan berkas lain yang kurang sebelum publish_app.`;
+}
+
 function getOptimizedMessages(rawMessages: any[]): any[] {
   // Retain message structure without destructive string placeholders to prevent code corruption
   return rawMessages;
@@ -586,6 +620,12 @@ export async function runAgenticLoop(options: RunAgentOptions): Promise<AgentRun
       throw new Error('BUILD_ABORTED_BY_USER');
     }
   };
+
+  // Anggaran waktu: Vercel memutus fungsi di 300 detik (maxDuration). Sisakan ruang untuk publish & simpan DB.
+  const loopStartedAt = Date.now();
+  const TIME_BUDGET_MS = 240000;
+  const remainingMs = () => TIME_BUDGET_MS - (Date.now() - loopStartedAt);
+  let publishBlockedCount = 0;
 
   // Inisialisasi workspace fisik di disk & periksa database
   const wsDir = getWorkspaceDir(sessionId);
@@ -890,6 +930,13 @@ Lakukan perubahan secara langsung pada berkas target (misal public/css/style.css
 
       todoList = syncTodoListProgress(todoList, { tool: 'run_tests' });
       await onEvent({ type: 'todo', todoList, generationMode: 'live-ai' });
+    } else if (name === 'publish_app' && publishBlockedCount < 3 && getMissingReferencedAssets(wsDir).length > 0) {
+      // Tolak publish selama berkas yang dirujuk index.html belum ada; minta AI melengkapinya dulu.
+      publishBlockedCount++;
+      const missing = getMissingReferencedAssets(wsDir);
+      const tc = await recordToolStart('publish_app', 'Publish ditunda: berkas aplikasi belum lengkap', args);
+      resultOutput = { success: false, error: getMissingAssetsGuidance(missing), missingFiles: missing };
+      await recordToolFinish(tc, resultOutput, 'failed');
     } else if (name === 'publish_app') {
       const tc = await recordToolStart('publish_app', `Menerbitkan aplikasi "${args.appName || 'Aplikasi Web'}"`, args);
       const appName = args.appName || dbApp?.name || 'Aplikasi Web';
@@ -1044,6 +1091,10 @@ function parseSseResponse(rawText: string): any {
 
     while (turn < MAX_TURNS && !deployedApp) {
       checkAborted();
+      if (turn > 0 && remainingMs() < 25000) {
+        console.warn(`[Agent] Time budget habis setelah turn ${turn}, menghentikan loop.`);
+        break;
+      }
       turn++;
 
       let res: Response | null = null;
@@ -1053,11 +1104,17 @@ function parseSseResponse(rawText: string): any {
       for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
           const isTurn1 = turn === 1 && !isFollowUp;
+          // Selama berkas inti masih kurang, paksa model memanggil tool (bukan sekadar membalas teks).
+          const coreIncomplete = !isTurn1 && writtenFiles.length > 0 && getMissingReferencedAssets(wsDir).length > 0;
           const reqBody: any = {
             model: aiConfig.defaultModel || 'ag/gemini-3-flash',
             messages: getOptimizedMessages(messages),
             tools: openAiTools,
-            tool_choice: isTurn1 ? { type: 'function', function: { name: 'write_file' } } : 'auto',
+            tool_choice: isTurn1
+              ? { type: 'function', function: { name: 'write_file' } }
+              : coreIncomplete
+                ? 'required'
+                : 'auto',
             temperature: 0.2,
             reasoning_effort: 'low',
             stream: false
@@ -1069,7 +1126,8 @@ function parseSseResponse(rawText: string): any {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${aiConfig.apiKey}`
             },
-            signal: AbortSignal.timeout(45000),
+            // Menulis berkas besar bisa > 45 detik; beri hingga 90 detik tapi jangan melewati sisa anggaran waktu.
+            signal: AbortSignal.timeout(Math.max(15000, Math.min(90000, remainingMs() - 10000))),
             body: JSON.stringify(reqBody)
           });
 
@@ -1093,7 +1151,7 @@ function parseSseResponse(rawText: string): any {
         } catch (fetchErr: any) {
           lastErrText = fetchErr.message;
           console.warn(`[AI Provider Fetch Error turn ${turn} attempt ${attempt}]:`, fetchErr.message);
-          if (attempt < MAX_RETRIES) {
+          if (attempt < MAX_RETRIES && remainingMs() > 40000) {
             await onEvent({
               type: 'plan',
               content: `Waktu respons AI melambat (${fetchErr.message}). Mengulang cepat (percobaan 2/2)...`,
@@ -1242,11 +1300,14 @@ function parseSseResponse(rawText: string): any {
           const hasHtml = writtenFiles.some((f) => f.includes('index.html'));
           const hasJs = writtenFiles.some((f) => f.includes('app.js'));
           const hasCss = writtenFiles.some((f) => f.includes('style.css'));
-          if (hasHtml && (hasJs || hasCss)) {
-            // Core files generated and model provided summary text, proceed to instant publish
+          const missingAssets = hasHtml ? getMissingReferencedAssets(wsDir) : [];
+          if (hasHtml && (hasJs || hasCss) && missingAssets.length === 0) {
+            // Core files generated (termasuk semua berkas yang dirujuk index.html), proceed to publish
             break;
           }
-          const nextGuidance = getNextStepGuidance(writtenFiles, toolCallsHistory);
+          const nextGuidance = missingAssets.length > 0
+            ? getMissingAssetsGuidance(missingAssets)
+            : getNextStepGuidance(writtenFiles, toolCallsHistory);
           messages.push({
             role: 'user',
             content: nextGuidance
@@ -1257,8 +1318,16 @@ function parseSseResponse(rawText: string): any {
       }
     }
 
+    // Jangan terbitkan aplikasi setengah jadi: jika index.html merujuk berkas yang belum ada, simpan sebagai draft saja.
+    const unfinishedAssets = !deployedApp && writtenFiles.length > 0 ? getMissingReferencedAssets(wsDir) : [];
+    if (unfinishedAssets.length > 0) {
+      const note = `⚠️ Pembuatan aplikasi belum selesai: berkas ${unfinishedAssets.join(', ')} belum sempat dibuat oleh AI, jadi aplikasi belum diterbitkan (kredit App tidak dipotong). Progres sudah tersimpan — ketik "lanjutkan" untuk melengkapinya.`;
+      summaryMessage += (summaryMessage ? '\n\n' : '') + note;
+      await onEvent({ type: 'message', content: note, generationMode: 'live-ai' });
+    }
+
     // Auto-finalize jika model menulis berkas tapi lupa memanggil publish_app di akhir
-    if (!deployedApp && writtenFiles.length > 0) {
+    if (!deployedApp && writtenFiles.length > 0 && unfinishedAssets.length === 0) {
       let appName = 'Aplikasi Web';
       let slug = 'web-app';
 
@@ -1339,6 +1408,10 @@ function parseSseResponse(rawText: string): any {
 
   while (geminiTurn < MAX_GEMINI_TURNS && !deployedApp) {
     checkAborted();
+    if (geminiTurn > 0 && remainingMs() < 25000) {
+      console.warn(`[Agent Gemini] Time budget habis setelah turn ${geminiTurn}, menghentikan loop.`);
+      break;
+    }
     geminiTurn++;
 
     let geminiResponse: any;
@@ -1437,11 +1510,14 @@ function parseSseResponse(rawText: string): any {
         const hasHtml = writtenFiles.some((f) => f.includes('index.html'));
         const hasJs = writtenFiles.some((f) => f.includes('app.js'));
         const hasCss = writtenFiles.some((f) => f.includes('style.css'));
-        if (hasHtml && (hasJs || hasCss)) {
-          // Core files generated and model provided summary text, proceed to instant publish
+        const missingAssets = hasHtml ? getMissingReferencedAssets(wsDir) : [];
+        if (hasHtml && (hasJs || hasCss) && missingAssets.length === 0) {
+          // Core files generated (termasuk semua berkas yang dirujuk index.html), proceed to publish
           break;
         }
-        const nextGuidance = getNextStepGuidance(writtenFiles, toolCallsHistory);
+        const nextGuidance = missingAssets.length > 0
+          ? getMissingAssetsGuidance(missingAssets)
+          : getNextStepGuidance(writtenFiles, toolCallsHistory);
         contents.push({
           role: 'user',
           parts: [{ text: nextGuidance }]
@@ -1452,8 +1528,16 @@ function parseSseResponse(rawText: string): any {
     }
   }
 
+  // Jangan terbitkan aplikasi setengah jadi: jika index.html merujuk berkas yang belum ada, simpan sebagai draft saja.
+  const unfinishedAssets = !deployedApp && writtenFiles.length > 0 ? getMissingReferencedAssets(wsDir) : [];
+  if (unfinishedAssets.length > 0) {
+    const note = `⚠️ Pembuatan aplikasi belum selesai: berkas ${unfinishedAssets.join(', ')} belum sempat dibuat oleh AI, jadi aplikasi belum diterbitkan (kredit App tidak dipotong). Progres sudah tersimpan — ketik "lanjutkan" untuk melengkapinya.`;
+    summaryMessage += (summaryMessage ? '\n\n' : '') + note;
+    await onEvent({ type: 'message', content: note, generationMode: 'live-ai' });
+  }
+
   // Auto-finalize jika Gemini menulis berkas tapi lupa publish_app
-  if (!deployedApp && writtenFiles.length > 0) {
+  if (!deployedApp && writtenFiles.length > 0 && unfinishedAssets.length === 0) {
     let appName = 'Aplikasi Web';
     let slug = 'web-app';
 
