@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminSession } from '@/lib/auth/admin-guard';
-import { updateUserProfile } from '@/lib/supabase/db';
+import { updateUserProfile, adminApproveUser } from '@/lib/supabase/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +21,13 @@ export async function POST(req: NextRequest) {
     let count = 0;
     for (const uid of userIds) {
       try {
-        await updateUserProfile(uid, { is_approved: is_approved !== false });
+        if (is_approved !== false) {
+          // Pakai alur ACC yang sama dengan approve satuan: aktifkan akun + bonus 100.000 Kredit AI & 1 Slot App
+          const ok = await adminApproveUser(uid);
+          if (!ok) throw new Error('adminApproveUser gagal');
+        } else {
+          await updateUserProfile(uid, { is_approved: false });
+        }
         count++;
       } catch (e) {
         console.error(`Failed to update approval for ${uid}:`, e);

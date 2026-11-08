@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Sparkles, Globe, ShieldAlert, Loader2, CheckCircle2, Zap, Clock, ArrowRight } from 'lucide-react';
+import { Sparkles, Globe, ShieldAlert, Loader2, CheckCircle2, Zap, Clock, ArrowRight, MessageCircle } from 'lucide-react';
+import { buildAdminWhatsAppLink, buildPaymentConfirmationMessage } from '@/lib/contact';
 
 export default function PlatformRegisterPage() {
   const [email, setEmail] = useState('');
@@ -65,15 +66,32 @@ export default function PlatformRegisterPage() {
 
           <div className="mt-4 p-4 rounded-xl bg-slate-950/70 border border-slate-800 text-left text-xs text-slate-300 space-y-2">
             <p>Akun <b className="text-white">@{registeredUser}</b> telah tersimpan di sistem.</p>
-            <p className="text-slate-400">Demi keamanan dan alokasi sumber daya, akun Anda harus disetujui terlebih dahulu oleh Administrator sebelum dapat digunakan.</p>
+            <p className="text-slate-400">Akun Anda aktif setelah pembayaran dikonfirmasi dan disetujui (ACC) oleh Admin. Kirim bukti transfer melalui WhatsApp admin di bawah ini.</p>
             <div className="pt-2 border-t border-slate-800 flex items-center gap-1.5 text-emerald-400">
               <CheckCircle2 className="w-3.5 h-3.5" /> Bonus 1 Slot App + 100.000 Kredit AI aktif otomatis setelah di-ACC.
             </div>
           </div>
 
+          {(() => {
+            const waLink = buildAdminWhatsAppLink(
+              buildPaymentConfirmationMessage({ username: registeredUser, email, packageId: 'basic_110k' })
+            );
+            return waLink ? (
+              <a
+                href={waLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-6 w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2"
+              >
+                <MessageCircle className="w-4 h-4" />
+                <span>Konfirmasi Pembayaran via WhatsApp</span>
+              </a>
+            ) : null;
+          })()}
+
           <Link
             href="/login"
-            className="mt-6 w-full py-3 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-semibold text-sm shadow-lg shadow-violet-600/30 transition-all flex items-center justify-center gap-2"
+            className="mt-3 w-full py-3 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-semibold text-sm shadow-lg shadow-violet-600/30 transition-all flex items-center justify-center gap-2"
           >
             <span>Kembali ke Halaman Masuk</span>
             <ArrowRight className="w-4 h-4" />
@@ -169,6 +187,12 @@ export default function PlatformRegisterPage() {
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Buat Akun Sekarang'}
           </button>
+          <p className="text-[11px] leading-relaxed text-slate-500 text-center">
+            Dengan mendaftar, Anda menyetujui{' '}
+            <Link href="/syarat-ketentuan" target="_blank" className="text-slate-300 underline hover:text-white">Syarat &amp; Ketentuan</Link>,{' '}
+            <Link href="/kebijakan-privasi" target="_blank" className="text-slate-300 underline hover:text-white">Kebijakan Privasi</Link>, dan{' '}
+            <Link href="/kebijakan-refund" target="_blank" className="text-slate-300 underline hover:text-white">Kebijakan Refund</Link>.
+          </p>
         </form>
 
         <div className="mt-6 text-center text-xs text-slate-400">

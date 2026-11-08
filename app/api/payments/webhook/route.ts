@@ -9,6 +9,11 @@ import {
 import { MidtransClient, MidtransWebhookPayload } from '@/lib/midtrans/client';
 
 export async function POST(req: NextRequest) {
+  // Tolak semua webhook selama server key Midtrans asli belum diatur (cegah signature palsu).
+  if (!process.env.MIDTRANS_SERVER_KEY) {
+    return NextResponse.json({ error: 'Pembayaran online tidak aktif' }, { status: 503 });
+  }
+
   try {
     const payload: MidtransWebhookPayload = await req.json();
     const midtrans = new MidtransClient();

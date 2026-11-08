@@ -47,6 +47,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  // Pembayaran online hanya aktif bila server key Midtrans asli sudah diatur.
+  // Tanpa itu, signature webhook bisa dipalsukan dengan key default -> kredit gratis.
+  if (!process.env.MIDTRANS_SERVER_KEY) {
+    return NextResponse.json(
+      { error: 'Pembayaran online belum aktif. Silakan konfirmasi pembayaran via WhatsApp admin.', useWhatsApp: true },
+      { status: 503 }
+    );
+  }
+
   const { packageId } = await req.json();
   const pkg = PACKAGES[packageId];
   if (!pkg) {

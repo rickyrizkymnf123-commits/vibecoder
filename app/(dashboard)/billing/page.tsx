@@ -17,12 +17,12 @@ import {
   Sparkles
 } from 'lucide-react';
 import { UserProfile } from '@/lib/types';
+import { ONLINE_PAYMENT_ENABLED, buildAdminWhatsAppLink, buildPaymentConfirmationMessage } from '@/lib/contact';
 
 export default function BillingPage() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState<string | null>(null);
-  const [simulatingWebhook, setSimulatingWebhook] = useState(false);
 
   useEffect(() => {
     fetchUserData();
@@ -43,7 +43,23 @@ export default function BillingPage() {
     }
   };
 
+  const openWhatsAppConfirmation = (packageId: string) => {
+    const link = buildAdminWhatsAppLink(
+      buildPaymentConfirmationMessage({ username: user?.username, email: user?.email, packageId })
+    );
+    if (link) {
+      window.open(link, '_blank');
+    } else {
+      alert('Silakan hubungi admin Kilat Tools untuk konfirmasi pembayaran paket ini.');
+    }
+  };
+
   const handleBuy = async (packageId: string) => {
+    // Mode default: pembayaran manual, konfirmasi ke WhatsApp admin, lalu admin menambahkan kredit.
+    if (!ONLINE_PAYMENT_ENABLED) {
+      openWhatsAppConfirmation(packageId);
+      return;
+    }
     setPurchasing(packageId);
     try {
       const res = await fetch('/api/payments/snap', {
@@ -53,6 +69,11 @@ export default function BillingPage() {
       });
 
       const data = await res.json();
+      if (data.useWhatsApp) {
+        openWhatsAppConfirmation(packageId);
+        setPurchasing(null);
+        return;
+      }
       if (!res.ok) {
         alert(data.error || 'Gagal membuat transaksi');
         setPurchasing(null);
@@ -68,45 +89,6 @@ export default function BillingPage() {
       alert('Terjadi kendala memproses pembayaran');
     } finally {
       setPurchasing(null);
-    }
-  };
-
-  const handleSimulateWebhook = async (itemType: string, amount: number) => {
-    setSimulatingWebhook(true);
-    try {
-      const orderId = `VC-SIM-${Date.now()}`;
-      await fetch('/api/payments/snap', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          packageId:
-            itemType === 'app_credit_bundle'
-              ? 'bundle_1'
-              : itemType === 'ai_credit_topup'
-              ? 'ai_topup_100k'
-              : 'pro_monthly'
-        })
-      });
-
-      const serverKey = 'SB-Mid-server-TEST_SANDBOX_KEY_FORGE';
-      await fetch('/api/payments/webhook', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          order_id: orderId,
-          status_code: '200',
-          gross_amount: `${amount}.00`,
-          signature_key: 'dummy-sha512-simulated',
-          transaction_status: 'settlement'
-        })
-      });
-
-      await fetchUserData();
-      alert('Simulasi settlement pembayaran berhasil diperbarui!');
-    } catch {
-      await fetchUserData();
-    } finally {
-      setSimulatingWebhook(false);
     }
   };
 
@@ -260,13 +242,6 @@ export default function BillingPage() {
                 'Beli Paket Basic (Rp 110.000)'
               )}
             </button>
-            <button
-              onClick={() => handleSimulateWebhook('basic_110k', 110000)}
-              disabled={simulatingWebhook}
-              className="w-full py-1.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-[10px] text-slate-400 transition-colors"
-            >
-              ⚡ Instant Sandbox Top-up (Dev Mode)
-            </button>
           </div>
         </div>
 
@@ -314,13 +289,6 @@ export default function BillingPage() {
                   <Zap className="w-3.5 h-3.5 text-violet-400" /> Top-Up 100k Token
                 </>
               )}
-            </button>
-            <button
-              onClick={() => handleSimulateWebhook('ai_credit_topup', 25000)}
-              disabled={simulatingWebhook}
-              className="w-full py-1.5 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-[10px] text-slate-400 transition-colors"
-            >
-              ⚡ Instant Sandbox Top-up
             </button>
           </div>
         </div>
@@ -398,13 +366,6 @@ export default function BillingPage() {
                   {user?.is_paid && !user?.is_pro ? '⭐ Upgrade ke Pro (+Rp 100.000)' : '⭐ Beli Paket Pro (Rp 210.000)'}
                 </>
               )}
-            </button>
-            <button
-              onClick={() => handleSimulateWebhook(user?.is_paid && !user?.is_pro ? 'pro_upgrade_100k' : 'pro_210k', user?.is_paid && !user?.is_pro ? 100000 : 210000)}
-              disabled={simulatingWebhook}
-              className="w-full py-1.5 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-[10px] text-amber-300 transition-colors"
-            >
-              ⚡ Instant Pro Activation Sandbox
             </button>
           </div>
         </div>

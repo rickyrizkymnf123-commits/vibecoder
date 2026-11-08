@@ -6,11 +6,13 @@ import { useRouter } from 'next/navigation';
 import { Sparkles, ArrowRight, ShieldAlert, Loader2, Zap } from 'lucide-react';
 
 import { KilatLogo } from '@/components/KilatLogo';
+import { buildAdminWhatsAppLink, buildPaymentConfirmationMessage } from '@/lib/contact';
 
 export default function PlatformLoginPage() {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [pendingApproval, setPendingApproval] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -25,6 +27,7 @@ export default function PlatformLoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setPendingApproval(false);
     setLoading(true);
 
     try {
@@ -37,6 +40,7 @@ export default function PlatformLoginPage() {
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || 'Gagal masuk akun');
+        setPendingApproval(Boolean(data.pendingApproval));
         setLoading(false);
         return;
       }
@@ -65,6 +69,22 @@ export default function PlatformLoginPage() {
             <span>{error}</span>
           </div>
         )}
+        {pendingApproval &&
+          (() => {
+            const waLink = buildAdminWhatsAppLink(
+              buildPaymentConfirmationMessage({ username: identifier, packageId: 'basic_110k' })
+            );
+            return waLink ? (
+              <a
+                href={waLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm transition-all flex items-center justify-center"
+              >
+                Konfirmasi Pembayaran via WhatsApp Admin
+              </a>
+            ) : null;
+          })()}
 
         <form onSubmit={handleLogin} className="mt-6 space-y-4">
           <div>

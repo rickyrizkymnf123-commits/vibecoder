@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserByEmailOrUsername, createUserProfile } from '@/lib/supabase/db';
 import { hashPassword } from '@/lib/auth/password';
-import { signSession, SESSION_COOKIE_NAME } from '@/lib/auth/session';
 
 export async function POST(req: NextRequest) {
   try {
@@ -32,43 +31,26 @@ export async function POST(req: NextRequest) {
         email: email.trim().toLowerCase(),
         username: cleanUsername,
         subdomain,
-        app_credits: 0, // 0 until package is purchased
-        ai_credits: 0, // 0 until package is purchased
+        // Kredit diberikan otomatis saat admin meng-ACC akun (100.000 Kredit AI + 1 Slot App)
+        app_credits: 0,
+        ai_credits: 0,
         is_pro: false,
         pro_until: null,
         role: 'user',
-        status: 'active',
-        is_approved: true,
+        status: 'pending',
+        is_approved: false,
         is_paid: false
       },
       passwordHash
     );
 
-    // Sign session cookie so user is logged in and lands immediately on package checkout / dashboard paywall
-    const token = signSession({
-      userId: newProfile.id,
-      email: newProfile.email,
-      username: newProfile.username,
-      subdomain: newProfile.subdomain,
-      role: newProfile.role || 'user'
-    });
-
-    const response = NextResponse.json({
+    // Akun baru menunggu ACC admin (setelah konfirmasi pembayaran via WhatsApp) — belum login otomatis.
+    return NextResponse.json({
       success: true,
-      pendingApproval: false,
-      message: 'Pendaftaran berhasil! Silakan pilih paket aktivasi untuk memulai.',
-      user: newProfile
+      pendingApproval: true,
+      message: 'Pendaftaran berhasil! Akun Anda menunggu persetujuan admin.',
+      user: { id: newProfile.id, username: newProfile.username, email: newProfile.email }
     });
-
-    response.cookies.set(SESSION_COOKIE_NAME, token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 60 * 60 * 24 * 30 // 30 days
-    });
-
-    return response;
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Gagal mendaftar' }, { status: 500 });
   }

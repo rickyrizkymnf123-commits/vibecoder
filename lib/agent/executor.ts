@@ -1,12 +1,58 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { exec } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { GeneratedApp } from '../types';
 import { saveApp, getAppBySlug } from '../supabase/db';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
+
+// ===================== SANDBOX KEAMANAN TOOL TERMINAL =====================
+// Proses anak TIDAK BOLEH mewarisi environment server (VERCEL_TOKEN, GITHUB_PAT,
+// SUPABASE_SERVICE_ROLE_KEY, API key AI, dll.). Mengosongkan env saja tidak cukup
+// (proses anak masih bisa membaca /proc/<pid>/environ milik induk), jadi tool bash
+// juga dibatasi ke daftar perintah inspeksi yang aman dan dijalankan TANPA shell.
+const SAFE_CHILD_ENV: NodeJS.ProcessEnv = {
+  PATH: process.env.PATH || '/usr/local/bin:/usr/bin:/bin',
+  HOME: os.tmpdir(),
+  NODE_ENV: 'production'
+};
+
+const ALLOWED_BASH_COMMANDS = new Set(['ls', 'pwd', 'cat', 'head', 'tail', 'wc']);
+
+function isSafeRelativePath(p: string): boolean {
+  return (
+    /^[A-Za-z0-9_][A-Za-z0-9_.\/-]*$/.test(p) &&
+    !p.split('/').includes('..') &&
+    !/(^|\/)(proc|environ)(\/|$)/i.test(p)
+  );
+}
+
+/** Kembalikan [binary, args] bila perintah aman, atau null bila ditolak. */
+function parseSafeCommand(command: string): [string, string[]] | null {
+  const trimmed = (command || '').trim();
+  if (!trimmed || /[;&|`$<>(){}\[\]\\'"*?!~\n\r]/.test(trimmed)) return null;
+  const tokens = trimmed.split(/\s+/);
+  const bin = tokens[0];
+  const args = tokens.slice(1);
+
+  if (bin === 'node') {
+    // Hanya pemeriksaan sintaks (tidak mengeksekusi kode).
+    if (args.length === 2 && args[0] === '--check' && isSafeRelativePath(args[1])) return ['node', args];
+    return null;
+  }
+  if (!ALLOWED_BASH_COMMANDS.has(bin)) return null;
+  for (const a of args) {
+    const isFlag = /^-[A-Za-z0-9]+$/.test(a);
+    const isNumber = /^[0-9]+$/.test(a);
+    if (!isFlag && !isNumber && !isSafeRelativePath(a)) return null;
+  }
+  return [bin, args];
+}
+
+/** Skrip pengujian buatan AI hanya boleh dieksekusi bila diizinkan eksplisit (mis. di mesin lokal). */
+const ALLOW_TEST_SCRIPT_EXECUTION = process.env.ALLOW_AGENT_TEST_SCRIPTS === 'true';
 
 export function getBaseWorkspacesDir(): string {
   // On Vercel / AWS Lambda / Serverless, /var/task is read-only.
@@ -147,25 +193,28 @@ export async function executeEditFile(
   };
 }
 
-function getPreferredShell(): string | undefined {
-  if (process.platform === 'win32') {
-    const gitBash = 'C:\\Program Files\\Git\\bin\\bash.exe';
-    if (fs.existsSync(gitBash)) return gitBash;
-  }
-  return undefined;
-}
-
 export async function executeBash(
   sessionId: string,
   command: string
 ): Promise<{ command: string; stdout: string; stderr: string; exitCode: number; success: boolean }> {
   const wsDir = getWorkspaceDir(sessionId);
-  const shell = getPreferredShell();
+  const parsed = parseSafeCommand(command);
+
+  if (!parsed) {
+    return {
+      command,
+      stdout: '',
+      stderr:
+        'Perintah ditolak oleh sandbox keamanan server. Yang diizinkan hanya: ls, pwd, cat, head, tail, wc (dengan path relatif di workspace) dan "node --check <berkas.js>". Gunakan write_file/edit_file untuk mengubah berkas dan run_tests untuk pengujian.',
+      exitCode: 126,
+      success: false
+    };
+  }
 
   try {
-    const { stdout, stderr } = await execAsync(command, {
+    const { stdout, stderr } = await execFileAsync(parsed[0], parsed[1], {
       cwd: wsDir,
-      shell,
+      env: SAFE_CHILD_ENV,
       timeout: 30000,
       maxBuffer: 1024 * 1024
     });
@@ -233,7 +282,9 @@ export async function executeRunTests(
   for (const jsFile of jsFiles) {
     const start = Date.now();
     try {
-      await execAsync(`node --check "${jsFile}"`, { cwd: wsDir, timeout: 8000 });
+      if (!isSafeRelativePath(jsFile)) throw new Error('Nama berkas tidak valid untuk diperiksa');
+      // execFile tanpa shell + env bersih: nama berkas tidak bisa disisipi perintah.
+      await execFileAsync('node', ['--check', jsFile], { cwd: wsDir, env: SAFE_CHILD_ENV, timeout: 8000 });
       testCases.push({ id: testId++, name: `Sintaks check: ${jsFile}`, status: 'pass', durationMs: Date.now() - start });
     } catch (e: any) {
       const errMsg = (e.stderr || e.stdout || e.message || '').trim();
@@ -247,8 +298,13 @@ export async function executeRunTests(
     const fullTestPath = path.join(wsDir, testScript);
     if (fs.existsSync(fullTestPath)) {
       const start = Date.now();
+      if (!ALLOW_TEST_SCRIPT_EXECUTION) {
+        // Di server produksi skrip buatan AI tidak dieksekusi (bisa membaca secret server).
+        testCases.push({ id: testId++, name: `Eksekusi skrip pengujian: ${testScript} (dilewati di server demi keamanan)`, status: 'pass', durationMs: 0 });
+        continue;
+      }
       try {
-        const { stdout } = await execAsync(`node "${testScript}"`, { cwd: wsDir, timeout: 20000 });
+        const { stdout } = await execFileAsync('node', [testScript], { cwd: wsDir, env: SAFE_CHILD_ENV, timeout: 20000 });
         testCases.push({ id: testId++, name: `Eksekusi skrip pengujian: ${testScript}`, status: 'pass', durationMs: Date.now() - start });
       } catch (e: any) {
         const errMsg = (e.stderr || e.stdout || e.message || '').trim();

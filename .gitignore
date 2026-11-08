@@ -36,3 +36,6 @@ workspaces/
 cookies.txt
 tests/
 test-*.mjs
+
+# data user lokal — jangan di-commit
+data/vibecoder_store.json

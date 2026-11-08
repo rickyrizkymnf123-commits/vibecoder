@@ -289,7 +289,12 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="py-12 border-t border-slate-800 text-center text-sm text-slate-500">
-        <p>&copy; 2026 Forge. Built with Next.js App Router, Supabase Postgres, and Vercel.</p>
+        <p>&copy; 2026 Kilat Tools. Semua hak dilindungi.</p>
+        <nav className="mt-3 flex flex-wrap justify-center gap-x-6 gap-y-2 text-xs">
+          <Link href="/syarat-ketentuan" className="hover:text-slate-300">Syarat &amp; Ketentuan</Link>
+          <Link href="/kebijakan-privasi" className="hover:text-slate-300">Kebijakan Privasi</Link>
+          <Link href="/kebijakan-refund" className="hover:text-slate-300">Kebijakan Refund</Link>
+        </nav>
       </footer>
     </div>
   );

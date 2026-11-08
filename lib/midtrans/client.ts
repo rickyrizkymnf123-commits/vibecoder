@@ -37,7 +37,7 @@ export class MidtransClient {
   private isProduction: boolean;
 
   constructor(serverKey?: string, clientKey?: string, isProduction = false) {
-    this.serverKey = serverKey || process.env.MIDTRANS_SERVER_KEY || 'SB-Mid-server-TEST_KEY';
+    this.serverKey = serverKey || process.env.MIDTRANS_SERVER_KEY || '';
     this.clientKey = clientKey || process.env.MIDTRANS_CLIENT_KEY || 'SB-Mid-client-TEST_KEY';
     this.isProduction = isProduction || process.env.MIDTRANS_IS_PRODUCTION === 'true';
   }
@@ -113,6 +113,7 @@ export class MidtransClient {
 
   verifySignature(payload: MidtransWebhookPayload): boolean {
     const { order_id, status_code, gross_amount, signature_key } = payload;
+    if (!this.serverKey) return false;
     if (!order_id || !status_code || !gross_amount || !signature_key) return false;
 
     // Signature formula: SHA512(order_id + status_code + gross_amount + ServerKey)
