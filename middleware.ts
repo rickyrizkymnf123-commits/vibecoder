@@ -23,6 +23,8 @@ export async function middleware(req: NextRequest) {
     hostname === 'kilatstools.my.id' ||
     hostname === 'www.kilatstools.my.id' ||
     hostname === 'forge-app-engine.vercel.app' ||
+    // URL deployment/preview Vercel milik project ini sendiri (bukan custom domain user)
+    hostname.endsWith('.vercel.app') ||
     hostname === 'localhost' ||
     hostname === '127.0.0.1';
 
