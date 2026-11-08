@@ -142,7 +142,7 @@ export default function LiveStagingCanvas({
   const publicUrl = deployedApp
     ? deployedApp.custom_domain
       ? `https://${deployedApp.custom_domain}`
-      : `https://${(deployedApp as any).user_subdomain || 'demo'}.kilattools.my.id/${deployedApp.slug}`
+      : `https://${(deployedApp as any).user_subdomain || 'demo'}.kilatstools.my.id/${deployedApp.slug}`
     : previewUrl;
 
   const hasActualFiles =

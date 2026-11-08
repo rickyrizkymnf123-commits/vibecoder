@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { parseJsArrayLiteral } from '@/lib/safe-literal';
 import fs from 'node:fs';
 import path from 'node:path';
 import { getAppBySlug, getChatSessionById, saveApp } from '@/lib/supabase/db';
+import { getCurrentUser } from '@/lib/auth/session';
 import { getBaseWorkspacesDir, getWorkspaceDir } from '@/lib/agent/executor';
 import { getActiveSessionState } from '@/lib/agent/loop';
 
@@ -32,8 +34,8 @@ function extractRecords(app: any): any[] {
       const dbJs = app.files['lib/db.js'];
       const match = dbJs.match(/let\s+records\s*=\s*(\[[\s\S]*?\]);/);
       if (match) {
-        const fn = new Function(`return ${match[1]};`);
-        const evaluated = fn();
+        // Parse sebagai data murni — JANGAN mengeksekusi kode buatan AI di server
+        const evaluated = parseJsArrayLiteral(match[1]);
         if (Array.isArray(evaluated)) return evaluated;
       }
     } catch {}
@@ -57,8 +59,8 @@ function extractUsers(app: any): any[] {
       const dbJs = app.files['lib/db.js'];
       const match = dbJs.match(/let\s+users\s*=\s*(\[[\s\S]*?\]);/);
       if (match) {
-        const fn = new Function(`return ${match[1]};`);
-        const evaluated = fn();
+        // Parse sebagai data murni — JANGAN mengeksekusi kode buatan AI di server
+        const evaluated = parseJsArrayLiteral(match[1]);
         if (Array.isArray(evaluated)) return evaluated;
       }
     } catch {}
@@ -261,6 +263,11 @@ function findStringDiff(oldStr: string, newStr: string): { oldPart: string; newP
 
   // 0. DIRECT VISUAL WYSIWYG SAVE (0 TOKEN - TANPA AI - INSTAN 0.1 DETIK)
   if (body.action === 'direct-save') {
+    // Edit visual mengubah berkas aplikasi -> hanya pemilik aplikasi (atau admin) yang boleh
+    const editor = await getCurrentUser();
+    if (!editor || (editor.userId !== app.user_id && editor.role !== 'admin')) {
+      return NextResponse.json({ error: 'Hanya pemilik aplikasi yang dapat mengedit tampilan' }, { status: 403 });
+    }
     if (!app.files) app.files = {};
     const oldText = body.oldText ? String(body.oldText).trim() : '';
     const newText = body.newText !== undefined ? String(body.newText).trim() : '';

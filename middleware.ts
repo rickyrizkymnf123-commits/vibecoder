@@ -30,6 +30,25 @@ export async function middleware(req: NextRequest) {
 
   // 1. Platform Root Domain -> Proceed normally
   if (isPlatformRoot) {
+    // Anti-CSRF: *.kilatstools.my.id satu "site" dengan domain utama (my.id = public suffix), jadi cookie
+    // login ikut terkirim dari aplikasi user di subdomain. Tolak request pengubah data dari origin lain.
+    const method = req.method.toUpperCase();
+    if (
+      url.pathname.startsWith('/api/') &&
+      !['GET', 'HEAD', 'OPTIONS'].includes(method) &&
+      !url.pathname.startsWith('/api/payments/webhook')
+    ) {
+      const origin = req.headers.get('origin');
+      if (origin) {
+        let originHost = '';
+        try {
+          originHost = new URL(origin).host.toLowerCase();
+        } catch {}
+        if (originHost !== host.toLowerCase()) {
+          return NextResponse.json({ error: 'Permintaan lintas origin ditolak' }, { status: 403 });
+        }
+      }
+    }
     return NextResponse.next();
   }
 
@@ -47,6 +66,11 @@ export async function middleware(req: NextRequest) {
       return NextResponse.rewrite(new URL(`/u/${subdomain}`, req.url));
     }
 
+    // API platform tidak dibuka di subdomain aplikasi user (kecuali runtime preview aplikasi itu sendiri)
+    if (url.pathname.startsWith('/api') && !url.pathname.startsWith('/api/preview/')) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+
     // B. Direct App path under subdomain (e.g. https://rickyrizky.kilatstools.my.id/gudangku-inventori-stok)
     // Directly serves the standalone app without '/preview/' in the browser URL
     if (!url.pathname.startsWith('/api') && !url.pathname.startsWith('/u/')) {
@@ -55,6 +79,11 @@ export async function middleware(req: NextRequest) {
     }
 
     return NextResponse.next();
+  }
+
+  // API platform tidak dibuka di custom domain user (kecuali runtime preview aplikasi)
+  if (url.pathname.startsWith('/api') && !url.pathname.startsWith('/api/preview/')) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
   // 3. Custom Domain (e.g. kasir.tokoberkah.com)

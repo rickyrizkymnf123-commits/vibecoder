@@ -35,6 +35,15 @@ export async function GET(req: NextRequest) {
     });
   }
 
+  // Isolasi: hanya pemilik sesi (atau admin) yang boleh melihat progres build
+  const ownedSession = await getChatSessionById(sessionId);
+  if (!ownedSession || (ownedSession.user_id !== session.userId && session.role !== 'admin')) {
+    return new Response(JSON.stringify({ error: 'Sesi tidak ditemukan atau akses ditolak' }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
   const activeState = getActiveSessionState(sessionId);
   if (!activeState || activeState.status !== 'building') {
     // If DB session was marked 'building' but no live worker in RAM exists (e.g. cold start/refresh after completion), sync DB status
@@ -131,6 +140,16 @@ export async function POST(req: NextRequest) {
   const user = await getUserProfile(session.userId);
   if (!user) {
     return new Response(JSON.stringify({ error: 'Pengguna tidak ditemukan' }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  // Isolasi: sesi chat (dan aplikasi/workspace-nya) hanya boleh dipakai pemiliknya.
+  // Tanpa ini, siapa pun yang tahu sessionId (= slug app publik) bisa menimpa aplikasi orang lain.
+  const ownedSession = await getChatSessionById(sessionId);
+  if (!ownedSession || ownedSession.user_id !== user.id) {
+    return new Response(JSON.stringify({ error: 'Sesi tidak ditemukan atau akses ditolak' }), {
       status: 404,
       headers: { 'Content-Type': 'application/json' }
     });

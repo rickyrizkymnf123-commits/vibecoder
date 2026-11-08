@@ -1,7 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { NextRequest, NextResponse } from 'next/server';
-import { getAppBySlug, getChatSessionById } from '@/lib/supabase/db';
+import { getAppBySlug, getChatSessionById, getUserProfile } from '@/lib/supabase/db';
+import { getCurrentUser } from '@/lib/auth/session';
 import { getBaseWorkspacesDir, getWorkspaceDir } from '@/lib/agent/executor';
 import { getActiveSessionState } from '@/lib/agent/loop';
 
@@ -30,6 +31,28 @@ export async function GET(
   const activeSession = getActiveSessionState(slug);
   if (!app && activeSession?.deployedApp) {
     app = activeSession.deployedApp as any;
+  }
+
+  // ISOLASI ANTAR USER: di domain utama platform, kode aplikasi hanya dijalankan untuk pemiliknya.
+  // Pengunjung lain (termasuk admin) diarahkan ke subdomain pemilik (origin terpisah), supaya JavaScript
+  // aplikasi orang lain tidak bisa memanggil API platform memakai cookie login pengunjung.
+  const requestHost = (req.headers.get('host') || '').split(':')[0].toLowerCase();
+  const isPlatformHost = requestHost === 'kilatstools.my.id' || requestHost === 'www.kilatstools.my.id';
+  if (isPlatformHost) {
+    const ownerId = (app as any)?.user_id || chatSession?.user_id || activeSession?.userId;
+    if (ownerId) {
+      const viewer = await getCurrentUser();
+      if (!viewer || viewer.userId !== ownerId) {
+        const owner = await getUserProfile(ownerId);
+        if (owner?.subdomain) {
+          return NextResponse.redirect(
+            `https://${owner.subdomain}.kilatstools.my.id/${encodeURIComponent(slug)}`,
+            302
+          );
+        }
+        return new NextResponse('Aplikasi tidak dapat ditampilkan di domain ini.', { status: 404 });
+      }
+    }
   }
 
   // Fallback 3: jika tidak ada di DB, cari di folder workspaces fisik di disk

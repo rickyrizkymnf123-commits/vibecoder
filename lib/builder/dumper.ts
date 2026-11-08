@@ -1,4 +1,5 @@
 import { GeneratedApp } from '../types';
+import { parseJsArrayLiteral } from '@/lib/safe-literal';
 
 function extractRecordsFromApp(app: GeneratedApp): any[] {
   if (!app.files) return [];
@@ -19,8 +20,8 @@ function extractRecordsFromApp(app: GeneratedApp): any[] {
       const dbJs = app.files['lib/db.js'];
       const match = dbJs.match(/let\s+records\s*=\s*(\[[\s\S]*?\]);/);
       if (match) {
-        const fn = new Function(`return ${match[1]};`);
-        const evaluated = fn();
+        // Parse sebagai data murni — JANGAN mengeksekusi kode buatan AI di server
+        const evaluated = parseJsArrayLiteral(match[1]);
         if (Array.isArray(evaluated) && evaluated.length > 0) return evaluated;
       }
     } catch {}
