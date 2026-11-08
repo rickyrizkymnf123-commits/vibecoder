@@ -291,7 +291,13 @@ export default function AdminPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Gagal menghapus massal');
 
-      notify('success', `${data.deletedCount} pengguna berhasil dihapus massal`);
+      const notes: string[] = [];
+      if (data.skippedAdmins?.length) notes.push(`akun admin dilewati: @${data.skippedAdmins.join(', @')}`);
+      if (data.errors?.length) notes.push(data.errors.join('; '));
+      notify(
+        data.deletedCount > 0 ? 'success' : 'error',
+        `${data.deletedCount} pengguna berhasil dihapus${notes.length ? ` (${notes.join(' — ')})` : ''}`
+      );
       setSelectedUserIds([]);
       await fetchInitialData();
     } catch (err: any) {

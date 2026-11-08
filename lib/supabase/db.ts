@@ -302,46 +302,66 @@ export async function adminSetUserCredits(
   }
 }
 
-export async function adminDeleteUser(userId: string): Promise<boolean> {
-  try {
-    const user = await getUserProfile(userId);
-    if (user && (user.username === 'demo' || user.role === 'admin')) {
-      throw new Error('Tidak dapat menghapus akun Administrator');
-    }
-
-    await supabaseAdmin.from('chat_messages').delete().eq('session_id', userId);
-    await supabaseAdmin.from('chat_sessions').delete().eq('user_id', userId);
-    await supabaseAdmin.from('apps').delete().eq('user_id', userId);
-    await supabaseAdmin.from('credit_transactions').delete().eq('user_id', userId);
-    await supabaseAdmin.from('payments').delete().eq('user_id', userId);
-    const { error } = await supabaseAdmin.from('profiles').delete().eq('id', userId);
-    return !error;
-  } catch (err) {
-    console.error('Failed to adminDeleteUser:', err);
-    return false;
-  }
+function isProtectedProfile(p: { username?: string | null; role?: string | null }): boolean {
+  return p.username === 'demo' || p.role === 'admin';
 }
 
-export async function adminBulkDeleteUsers(userIds: string[]): Promise<{ deletedCount: number; errors: string[] }> {
-  let deletedCount = 0;
-  const errors: string[] = [];
+/**
+ * Hapus satu user. Semua data turunan (chat_sessions -> chat_messages, apps, credit_transactions,
+ * payments, storage_files, user_subscriptions) ikut terhapus lewat ON DELETE CASCADE di database.
+ */
+export async function adminDeleteUser(userId: string): Promise<{ ok: boolean; error?: string }> {
+  const { data: profile, error: findErr } = await supabaseAdmin
+    .from('profiles')
+    .select('id, username, role')
+    .eq('id', userId)
+    .maybeSingle();
 
-  for (const id of userIds) {
-    try {
-      const user = await getUserProfile(id);
-      if (user && (user.username === 'demo' || user.role === 'admin')) {
-        errors.push(`Akun admin (${user.username}) dilindungi dari penghapusan massal.`);
-        continue;
-      }
-      const ok = await adminDeleteUser(id);
-      if (ok) deletedCount++;
-      else errors.push(`Gagal menghapus user ID: ${id}`);
-    } catch (e: any) {
-      errors.push(e.message || `Error pada user ID: ${id}`);
-    }
+  if (findErr) return { ok: false, error: `Gagal membaca data user: ${findErr.message}` };
+  if (!profile) return { ok: false, error: 'User tidak ditemukan (mungkin sudah dihapus)' };
+  if (isProtectedProfile(profile)) {
+    return { ok: false, error: `Akun admin @${profile.username} dilindungi dan tidak dapat dihapus` };
   }
 
-  return { deletedCount, errors };
+  const { error } = await supabaseAdmin.from('profiles').delete().eq('id', userId);
+  if (error) {
+    console.error('Failed to adminDeleteUser:', error);
+    return { ok: false, error: `Gagal menghapus user: ${error.message}` };
+  }
+  return { ok: true };
+}
+
+/** Hapus banyak user sekaligus dalam satu query; akun admin dilewati dan dilaporkan. */
+export async function adminBulkDeleteUsers(
+  userIds: string[]
+): Promise<{ deletedCount: number; skippedAdmins: string[]; errors: string[] }> {
+  const ids = Array.from(new Set(userIds.filter((id) => typeof id === 'string' && id.length > 0)));
+  if (ids.length === 0) return { deletedCount: 0, skippedAdmins: [], errors: [] };
+
+  const { data: profiles, error: findErr } = await supabaseAdmin
+    .from('profiles')
+    .select('id, username, role')
+    .in('id', ids);
+  if (findErr) return { deletedCount: 0, skippedAdmins: [], errors: [`Gagal membaca data user: ${findErr.message}`] };
+
+  const found = profiles || [];
+  const skippedAdmins = found.filter(isProtectedProfile).map((p: any) => p.username || p.id);
+  const deletable = found.filter((p: any) => !isProtectedProfile(p)).map((p: any) => p.id);
+
+  const errors: string[] = [];
+  const missing = ids.length - found.length;
+  if (missing > 0) errors.push(`${missing} user tidak ditemukan (mungkin sudah dihapus)`);
+
+  if (deletable.length === 0) return { deletedCount: 0, skippedAdmins, errors };
+
+  const { data: deleted, error } = await supabaseAdmin.from('profiles').delete().in('id', deletable).select('id');
+  if (error) {
+    console.error('Failed to adminBulkDeleteUsers:', error);
+    errors.push(`Gagal menghapus user: ${error.message}`);
+    return { deletedCount: 0, skippedAdmins, errors };
+  }
+
+  return { deletedCount: deleted?.length || 0, skippedAdmins, errors };
 }
 
 // ======================== CREDIT OPERATIONS ========================

@@ -207,9 +207,9 @@ export async function DELETE(req: NextRequest) {
     const singleId = searchParams.get('id');
 
     if (singleId) {
-      const ok = await adminDeleteUser(singleId);
-      if (!ok) {
-        return NextResponse.json({ error: 'Gagal menghapus user atau akun dilindungi' }, { status: 400 });
+      const result = await adminDeleteUser(singleId);
+      if (!result.ok) {
+        return NextResponse.json({ error: result.error || 'Gagal menghapus user' }, { status: 400 });
       }
       return NextResponse.json({ success: true, message: 'User berhasil dihapus' });
     }
@@ -223,6 +223,9 @@ export async function DELETE(req: NextRequest) {
     }
 
     const result = await adminBulkDeleteUsers(userIds);
+    if (result.deletedCount === 0 && result.errors.length > 0) {
+      return NextResponse.json({ error: result.errors.join('; '), ...result }, { status: 400 });
+    }
     return NextResponse.json({
       success: true,
       message: `${result.deletedCount} user berhasil dihapus massal`,
