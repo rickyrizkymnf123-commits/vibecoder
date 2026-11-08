@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAiConfig, saveAiConfig } from '@/lib/ai/config';
-import { getCurrentUser } from '@/lib/auth/session';
+import { getAiConfigAsync, saveAiConfigAsync } from '@/lib/ai/config';
+import { requireAdminSession } from '@/lib/auth/admin-guard';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const session = await getCurrentUser();
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await requireAdminSession();
+  if (!auth.authorized) {
+    return NextResponse.json({ error: 'Akses ditolak. Pengaturan API khusus Administrator.' }, { status: auth.status });
   }
 
-  const config = getAiConfig();
+  const config = await getAiConfigAsync();
   const maskedKey = config.apiKey
     ? config.apiKey.length > 8
       ? `${config.apiKey.slice(0, 4)}••••••••${config.apiKey.slice(-4)}`
@@ -21,7 +21,7 @@ export async function GET() {
     success: true,
     config: {
       baseUrl: config.baseUrl,
-      apiKey: config.apiKey, // sent so user can edit or toggle eye
+      apiKey: config.apiKey,
       apiKeyMasked: maskedKey,
       hasKey: Boolean(config.apiKey),
       defaultModel: config.defaultModel,
@@ -31,14 +31,14 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getCurrentUser();
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await requireAdminSession();
+  if (!auth.authorized) {
+    return NextResponse.json({ error: 'Akses ditolak. Pengaturan API khusus Administrator.' }, { status: auth.status });
   }
 
   try {
     const body = await req.json();
-    const updated = saveAiConfig({
+    const updated = await saveAiConfigAsync({
       baseUrl: body.baseUrl,
       apiKey: body.apiKey,
       defaultModel: body.defaultModel
@@ -49,6 +49,7 @@ export async function POST(req: NextRequest) {
       message: 'Pengaturan AI berhasil disimpan!',
       config: {
         baseUrl: updated.baseUrl,
+        apiKey: updated.apiKey,
         defaultModel: updated.defaultModel,
         hasKey: Boolean(updated.apiKey)
       }

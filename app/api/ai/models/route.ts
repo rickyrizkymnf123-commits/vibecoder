@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchModelsFromProvider, getAiConfig } from '@/lib/ai/config';
-import { getCurrentUser } from '@/lib/auth/session';
+import { requireAdminSession } from '@/lib/auth/admin-guard';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
-  const session = await getCurrentUser();
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await requireAdminSession();
+  if (!auth.authorized) {
+    return NextResponse.json({ error: 'Akses ditolak. Pengaturan API khusus Administrator.' }, { status: auth.status });
   }
 
   try {

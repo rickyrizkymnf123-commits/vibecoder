@@ -117,32 +117,6 @@ export const AGENT_TOOLS: GeminiFunctionDeclaration[] = [
     }
   },
   {
-    name: 'todo_write',
-    description: 'Membuat atau memperbarui daftar tugas pengerjaan proyek (daftar Todo) agar pengguna dapat melihat progres pengerjaan secara bertahap.',
-    parameters: {
-      type: 'OBJECT',
-      properties: {
-        todos: {
-          type: 'ARRAY',
-          description: 'Daftar tugas pengerjaan.',
-          items: {
-            type: 'OBJECT',
-            properties: {
-              id: { type: 'STRING', description: 'ID unik tugas, misal 1' },
-              title: { type: 'STRING', description: 'Judul tugas pengerjaan' },
-              status: {
-                type: 'STRING',
-                description: 'Status: "pending", "in_progress", atau "completed"'
-              }
-            },
-            required: ['title', 'status']
-          }
-        }
-      },
-      required: ['todos']
-    }
-  },
-  {
     name: 'publish_app',
     description: 'Mempublikasikan aplikasi yang sudah selesai dibangun dan lolos pengujian ke antarmuka interactive live preview.',
     parameters: {
@@ -182,32 +156,6 @@ export function getOpenAiTools() {
             }
           },
           required: ['path', 'content']
-        }
-      }
-    },
-    {
-      type: 'function' as const,
-      function: {
-        name: 'todo_write',
-        description: 'Membuat atau memperbarui daftar rencana tugas kerja (Todo list)',
-        parameters: {
-          type: 'object',
-          properties: {
-            todos: {
-              type: 'array',
-              description: 'Daftar tugas',
-              items: {
-                type: 'object',
-                properties: {
-                  id: { type: 'string' },
-                  title: { type: 'string' },
-                  status: { type: 'string', enum: ['pending', 'in_progress', 'completed'] }
-                },
-                required: ['title', 'status']
-              }
-            }
-          },
-          required: ['todos']
         }
       }
     },

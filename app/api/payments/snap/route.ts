@@ -3,26 +3,41 @@ import { getCurrentUser } from '@/lib/auth/session';
 import { createPayment } from '@/lib/supabase/db';
 import { MidtransClient } from '@/lib/midtrans/client';
 
-const PACKAGES: Record<string, { name: string; price: number; type: 'app_credit_bundle' | 'ai_credit_topup' | 'pro_subscription' }> = {
-  topup_app_100k: {
-    name: 'Top Up Kredit App (1 Slot App + 100.000 Kredit AI)',
+const PACKAGES: Record<string, { name: string; price: number; type: 'basic_110k' | 'pro_210k' | 'pro_upgrade_100k' | 'app_credit_bundle' | 'ai_credit_topup' | 'pro_subscription' }> = {
+  basic_110k: {
+    name: 'Paket Basic (1 App Siap Publish + 50.000 Kredit AI)',
     price: 110000,
-    type: 'app_credit_bundle'
+    type: 'basic_110k'
+  },
+  topup_app_100k: {
+    name: 'Paket Basic (1 App Siap Publish + 50.000 Kredit AI)',
+    price: 110000,
+    type: 'basic_110k'
   },
   bundle_1: {
-    name: '1 Slot App + 100.000 Kredit AI',
+    name: 'Paket Basic (1 App Siap Publish + 50.000 Kredit AI)',
     price: 110000,
-    type: 'app_credit_bundle'
+    type: 'basic_110k'
   },
-  ai_topup_100k: {
-    name: '100.000 Kredit AI Top-Up',
-    price: 25000,
-    type: 'ai_credit_topup'
+  pro_210k: {
+    name: 'Paket Pro (1 App + 100.000 Kredit AI + Seluruh Fitur Pro)',
+    price: 210000,
+    type: 'pro_210k'
+  },
+  pro_upgrade_100k: {
+    name: 'Upgrade ke Tier Pro (+50.000 Kredit AI + Seluruh Fitur Pro)',
+    price: 100000,
+    type: 'pro_upgrade_100k'
   },
   pro_monthly: {
-    name: 'Langganan Forge Pro (30 Hari + Custom Domain + 10GB Storage)',
+    name: 'Upgrade ke Tier Pro (+50.000 Kredit AI + Seluruh Fitur Pro)',
     price: 100000,
-    type: 'pro_subscription'
+    type: 'pro_upgrade_100k'
+  },
+  ai_topup_100k: {
+    name: 'Top-Up 100.000 Kredit AI Token',
+    price: 25000,
+    type: 'ai_credit_topup'
   }
 };
 

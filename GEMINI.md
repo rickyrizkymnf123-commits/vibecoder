@@ -5,4 +5,4 @@
 - Seluruh 10 langkah wajib AI Engine terimplementasi di `lib/builder/generator.ts`.
 - Validasi sintaks AST menggunakan `lib/builder/linter.ts` dan pengujian in-process nyata di `lib/builder/tester.ts`.
 - Script pengujian `npm run build`, `npx tsc --noEmit`, `node tests/inprocess-test.mjs`, dan `node tests/test-engine-e2e.mjs` telah diverifikasi dan siap dieksekusi setiap saat.
-- Mendukung integrasi AI Central Custom Provider (LiteLLM/Koboillm/OpenAI-compatible) melalui halaman Pengaturan Akun (`/account`), memungkinkan pengguna menggunakan API Key dan model pilihan mereka sendiri untuk memandu pembuatan aplikasi secara nyata via ReAct loop.
+- Mendukung integrasi AI Central Custom Provider (KoboiLLM / OpenRouter / OpenAI-compatible / Gemini) yang dikontrol secara terpusat oleh Superadmin via Panel Admin (`/admin`), dengan guard endpoint API backend dan layout responsif mobile anti-cut.

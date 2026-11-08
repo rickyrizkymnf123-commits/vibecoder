@@ -32,23 +32,43 @@ export async function POST(req: NextRequest) {
         email: email.trim().toLowerCase(),
         username: cleanUsername,
         subdomain,
-        app_credits: 1, // 1 App publish credit slot
-        ai_credits: 100000, // 100.000 Kredit AI
+        app_credits: 0, // 0 until package is purchased
+        ai_credits: 0, // 0 until package is purchased
         is_pro: false,
         pro_until: null,
         role: 'user',
-        status: 'pending',
-        is_approved: false
+        status: 'active',
+        is_approved: true,
+        is_paid: false
       },
       passwordHash
     );
 
-    return NextResponse.json({
+    // Sign session cookie so user is logged in and lands immediately on package checkout / dashboard paywall
+    const token = signSession({
+      userId: newProfile.id,
+      email: newProfile.email,
+      username: newProfile.username,
+      subdomain: newProfile.subdomain,
+      role: newProfile.role || 'user'
+    });
+
+    const response = NextResponse.json({
       success: true,
-      pendingApproval: true,
-      message: 'Pendaftaran berhasil! Akun Anda sedang menunggu persetujuan (ACC) dari Admin sebelum dapat digunakan.',
+      pendingApproval: false,
+      message: 'Pendaftaran berhasil! Silakan pilih paket aktivasi untuk memulai.',
       user: newProfile
     });
+
+    response.cookies.set(SESSION_COOKIE_NAME, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 30 // 30 days
+    });
+
+    return response;
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Gagal mendaftar' }, { status: 500 });
   }

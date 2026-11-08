@@ -130,15 +130,20 @@ export default function CustomDomainsPage() {
       const res = await fetch(`/api/deploy/domain?appId=${app.id}&verify=true`);
       const data = await res.json();
 
-      if (res.ok && data.verified) {
+      if (res.ok && data.verified && data.status === 'verified') {
         setToastMessage({
           type: 'success',
           text: `Selamat! Domain ${app.custom_domain} telah terverifikasi aktif dan siap diakses dengan HTTPS.`
         });
-      } else {
+      } else if (data.status === 'failed') {
         setToastMessage({
           type: 'error',
-          text: `DNS untuk ${app.custom_domain} belum terverifikasi penuh. Pastikan kedua record (TXT dan A) sudah terpasang di provider domain Anda. Propagasi biasanya memerlukan 1-15 menit.`
+          text: `Verifikasi gagal untuk ${app.custom_domain}. Pastikan kedua record (TXT dan A) sudah terpasang dengan benar di registrar Anda.`
+        });
+      } else {
+        setToastMessage({
+          type: 'info',
+          text: `Status ${app.custom_domain}: Menunggu DNS. Record DNS belum terdeteksi aktif di internet (Vercel Edge belum mendeteksi A/CNAME record). Harap tunggu proses propagasi DNS (1-15 menit).`
         });
       }
       await fetchApps();

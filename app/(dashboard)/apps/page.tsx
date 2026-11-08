@@ -87,6 +87,7 @@ export default function AppsPage() {
         setConfirmDeleteId(null);
         setActionMessage({ type: 'success', text: 'Aplikasi berhasil dihapus dari platform' });
         setTimeout(() => setActionMessage(null), 3500);
+        window.dispatchEvent(new CustomEvent('forge:app-deleted', { detail: { appId } }));
       }
     } catch {
       setActionMessage({ type: 'error', text: 'Terjadi kesalahan saat menghubungi server' });

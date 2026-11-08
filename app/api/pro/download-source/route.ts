@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import fs from 'node:fs';
 import path from 'node:path';
 import { getCurrentUser } from '@/lib/auth/session';
 import { getAppById, getUserProfile } from '@/lib/supabase/db';
 import { zipAppSource } from '@/lib/builder/zipper';
-import { collectAllFiles } from '@/lib/agent/executor';
+import { collectAllFiles, getWorkspaceDir } from '@/lib/agent/executor';
 
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
@@ -37,8 +38,8 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const wsDir = app.session_id ? path.join(process.cwd(), 'workspaces', app.session_id) : '';
-  const diskFiles = wsDir ? collectAllFiles(wsDir) : {};
+  const wsDir = app.session_id ? getWorkspaceDir(app.session_id) : '';
+  const diskFiles = wsDir && fs.existsSync(wsDir) ? collectAllFiles(wsDir) : {};
   const filesToZip = { ...(app.files || {}), ...diskFiles };
 
   const zipBuffer = await zipAppSource(filesToZip);

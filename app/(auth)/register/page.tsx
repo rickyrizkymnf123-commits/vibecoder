@@ -96,7 +96,7 @@ export default function PlatformRegisterPage() {
         </div>
 
         <h2 className="text-2xl font-bold text-white tracking-tight">Daftar Akun Kilat Tools</h2>
-        <p className="text-sm text-slate-400 mt-1">Dapatkan 1 Slot Publikasi App + 100.000 Kredit AI</p>
+        <p className="text-sm text-slate-400 mt-1">Pilih Paket Basic (Rp 110k) atau Pro (Rp 210k) — Langsung Aktif</p>
 
         {error && (
           <div className="mt-4 p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300 text-sm flex items-center gap-2">

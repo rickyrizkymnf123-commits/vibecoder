@@ -42,18 +42,22 @@ export async function POST(req: NextRequest) {
 
     if (isSuccess) {
       // Fulfill based on item_type
-      if (payment.item_type === 'app_credit_bundle') {
-        // 1 App Credit + 100,000 AI Credits
+      if (payment.item_type === 'basic_110k' || payment.item_type === 'app_credit_bundle') {
+        // Basic: 1 App Credit + 50,000 AI Credits
+        await addAppCredits(payment.user_id, 1, `midtrans_order_${orderId}`);
+        await addAiCredits(payment.user_id, 50000, `midtrans_order_${orderId}`);
+      } else if (payment.item_type === 'pro_210k') {
+        // Pro New: 1 App Credit + 100,000 AI Credits + Pro Tier
         await addAppCredits(payment.user_id, 1, `midtrans_order_${orderId}`);
         await addAiCredits(payment.user_id, 100000, `midtrans_order_${orderId}`);
+        await upgradeToPro(payment.user_id, 365);
+      } else if (payment.item_type === 'pro_upgrade_100k' || payment.item_type === 'pro_subscription') {
+        // Pro Upgrade: +50,000 AI Credits + Pro Tier
+        await addAiCredits(payment.user_id, 50000, `midtrans_pro_upgrade_${orderId}`);
+        await upgradeToPro(payment.user_id, 365);
       } else if (payment.item_type === 'ai_credit_topup') {
         // 100,000 AI Credits
         await addAiCredits(payment.user_id, 100000, `midtrans_order_${orderId}`);
-      } else if (payment.item_type === 'pro_subscription') {
-        // Pro subscription: 30 days + 5 App Credits + 250,000 AI Credits
-        await upgradeToPro(payment.user_id, 30);
-        await addAppCredits(payment.user_id, 5, `midtrans_pro_bonus_${orderId}`);
-        await addAiCredits(payment.user_id, 250000, `midtrans_pro_bonus_${orderId}`);
       }
     }
 

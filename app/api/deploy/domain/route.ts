@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
   // 5. Simpan challenge dan data verifikasi ke Supabase DB
   const updated = await updateApp(app.id, {
     custom_domain: cleanDomain,
-    domain_status: assignResult.verified ? 'verified' : 'pending_verification',
+    domain_status: assignResult.status,
     domain_verification: domainVerificationData
   });
 
@@ -95,6 +95,7 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     success: true,
     verified: assignResult.verified,
+    status: assignResult.status,
     app: updated,
     dnsRecords: {
       txtRecord: assignResult.txtRecord,
@@ -127,10 +128,10 @@ export async function GET(req: NextRequest) {
 
   const vercel = new VercelClient();
 
-  // TAHAP 2: Jika parameter verify=true, panggil endpoint POST .../verify Vercel
+  // TAHAP 2: Jika parameter verify=true, panggil endpoint POST .../verify Vercel + Layer 2 DNS check
   if (doVerify) {
     const verifyResult = await vercel.verifyDomain(targetDomain);
-    const newStatus = verifyResult.verified ? 'verified' : 'failed';
+    const newStatus = verifyResult.status;
 
     let updatedApp = targetApp;
     if (targetApp) {

@@ -1,17 +1,22 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { cookies } from 'next/headers';
-import { UserProfile } from '../types';
+import { UserProfile, AppRole } from '../types';
 
 const SESSION_SECRET = process.env.SESSION_SECRET || 'forge-session-secret-key-32bytes-len';
 export const SESSION_COOKIE_NAME = 'forge_session';
+export const IMPERSONATION_COOKIE_NAME = 'forge_impersonation';
 
 export interface SessionPayload {
   userId: string;
   email: string;
   username: string;
   subdomain: string;
-  role?: 'admin' | 'user';
+  role?: AppRole;
   exp: number;
+  is_impersonating?: boolean;
+  original_admin_id?: string;
+  original_admin_email?: string;
+  original_admin_username?: string;
 }
 
 export function signSession(payload: Omit<SessionPayload, 'exp'>, expiresInSeconds = 30 * 24 * 60 * 60): string {
@@ -45,12 +50,60 @@ export function verifySession(token: string): SessionPayload | null {
   }
 }
 
+export async function getRealAdminUser(): Promise<SessionPayload | null> {
+  try {
+    const cookieStore = cookies();
+    const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+    if (!token) return null;
+    const realUser = verifySession(token);
+    if (!realUser) return null;
+    const isRealAdmin =
+      realUser.role === 'admin' ||
+      realUser.username === 'demo' ||
+      realUser.email === 'demo@vibecoder.app' ||
+      realUser.email === 'rickyrizkymnf123@gmail.com' ||
+      realUser.username === 'ricky' ||
+      realUser.username === 'rickyrizky';
+    if (!isRealAdmin) return null;
+    return realUser;
+  } catch {
+    return null;
+  }
+}
+
 export async function getCurrentUser(): Promise<SessionPayload | null> {
   try {
     const cookieStore = cookies();
     const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
     if (!token) return null;
-    return verifySession(token);
+    const realUser = verifySession(token);
+    if (!realUser) return null;
+
+    const isRealAdmin =
+      realUser.role === 'admin' ||
+      realUser.username === 'demo' ||
+      realUser.email === 'demo@vibecoder.app' ||
+      realUser.email === 'rickyrizkymnf123@gmail.com' ||
+      realUser.username === 'ricky' ||
+      realUser.username === 'rickyrizky';
+
+    if (isRealAdmin) {
+      const impToken = cookieStore.get(IMPERSONATION_COOKIE_NAME)?.value;
+      if (impToken) {
+        const impUser = verifySession(impToken);
+        if (impUser) {
+          return {
+            ...impUser,
+            is_impersonating: true,
+            original_admin_id: realUser.userId,
+            original_admin_email: realUser.email,
+            original_admin_username: realUser.username
+          };
+        }
+      }
+    }
+
+    return realUser;
   } catch {
     return null;
   }

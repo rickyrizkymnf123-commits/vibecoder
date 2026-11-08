@@ -1,7 +1,14 @@
-import { getCurrentUser } from './session';
+import { getRealAdminUser, getCurrentUser } from './session';
 import { getUserProfile } from '../supabase/db';
 
 export async function requireAdminSession() {
+  // 1. Check if the original logged-in user is an admin (even if currently impersonating)
+  const realAdmin = await getRealAdminUser();
+  if (realAdmin) {
+    return { authorized: true, session: realAdmin, status: 200 };
+  }
+
+  // 2. Fallback to current session
   const session = await getCurrentUser();
   if (!session) {
     return { authorized: false, error: 'Unauthorized: Sesi tidak ditemukan', status: 401 };

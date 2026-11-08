@@ -146,9 +146,9 @@ export class VercelClient {
       });
 
       const data = await res.json();
-      const isVerified = Boolean(data.verified);
+      const domainData = data.error?.domain || data;
 
-      // Extract TXT Challenge from Vercel verification array
+      // Extract TXT Challenge from Vercel verification array (for claimed/conflicted domains)
       let txtRecord = {
         type: 'TXT',
         host: '_vercel',
@@ -156,8 +156,9 @@ export class VercelClient {
         value: `vc-domain-verify=${domain}`
       };
 
-      if (Array.isArray(data.verification) && data.verification.length > 0) {
-        const txtItem = data.verification.find((v: any) => v.type === 'TXT') || data.verification[0];
+      const verifArray = domainData.verification || data.verification;
+      if (Array.isArray(verifArray) && verifArray.length > 0) {
+        const txtItem = verifArray.find((v: any) => v.type === 'TXT') || verifArray[0];
         if (txtItem) {
           const hostPart = txtItem.domain
             ? txtItem.domain.replace(new RegExp(`\\.?${domain}$`), '') || '_vercel'
@@ -171,9 +172,27 @@ export class VercelClient {
         }
       }
 
+      // Layer 2: Real DNS Routing Check (misconfigured !== true && configuredBy !== null)
+      let isDnsConfigured = false;
+      let configData: any = null;
+      try {
+        const confRes = await fetch(`https://api.vercel.com/v6/domains/${encodeURIComponent(domain)}/config`, {
+          headers: { Authorization: `Bearer ${this.token}` }
+        });
+        if (confRes.ok) {
+          configData = await confRes.json();
+          isDnsConfigured = Boolean(configData && configData.misconfigured === false && configData.configuredBy);
+        }
+      } catch (confErr) {
+        console.warn('Vercel domain config check exception:', confErr);
+      }
+
+      const isOwnershipVerified = Boolean(domainData.verified);
+      const isFullyVerified = isOwnershipVerified && isDnsConfigured;
+
       return {
-        success: true,
-        verified: isVerified,
+        success: res.ok || data.error?.code === 'domain_already_in_use',
+        verified: isFullyVerified,
         domain,
         txtRecord,
         aRecord: {
@@ -181,8 +200,8 @@ export class VercelClient {
           host: '@',
           value: '76.76.21.21'
         },
-        status: isVerified ? 'verified' : 'pending_verification',
-        rawData: data
+        status: isFullyVerified ? 'verified' : 'pending_verification',
+        rawData: { domain: domainData, config: configData }
       };
     } catch (err: any) {
       console.warn('Vercel assign custom domain API exception:', err);
@@ -209,14 +228,21 @@ export class VercelClient {
   /**
    * TAHAP 2: Trigger verify endpoint on Vercel to actively check TXT + A records
    */
-  async verifyDomain(domain: string): Promise<{ success: boolean; verified: boolean; error?: string; rawData?: any }> {
+  async verifyDomain(domain: string): Promise<{
+    success: boolean;
+    verified: boolean;
+    status: 'pending_verification' | 'verified' | 'failed';
+    error?: string;
+    rawData?: any;
+  }> {
     const projectId = process.env.VERCEL_PROJECT_ID || 'prj_CPiv8zjHnSqrA1Q1wbqJxki43iZp';
 
     if (!this.token) {
-      return { success: true, verified: true };
+      return { success: true, verified: false, status: 'pending_verification' };
     }
 
     try {
+      // 1. Layer 1: Trigger active ownership verification (TXT challenge check)
       const res = await fetch(`https://api.vercel.com/v9/projects/${projectId}/domains/${encodeURIComponent(domain)}/verify`, {
         method: 'POST',
         headers: {
@@ -226,17 +252,44 @@ export class VercelClient {
       });
 
       const data = await res.json();
-      const isVerified = Boolean(data.verified);
+      const isOwnershipVerified = Boolean(data.verified);
+
+      // 2. Layer 2: Check DNS routing configuration (A / CNAME propagation)
+      let isDnsConfigured = false;
+      let configData: any = null;
+      try {
+        const confRes = await fetch(`https://api.vercel.com/v6/domains/${encodeURIComponent(domain)}/config`, {
+          headers: { Authorization: `Bearer ${this.token}` }
+        });
+        if (confRes.ok) {
+          configData = await confRes.json();
+          isDnsConfigured = Boolean(configData && configData.misconfigured === false && configData.configuredBy);
+        }
+      } catch (confErr) {
+        console.warn('Vercel domain config check exception in verifyDomain:', confErr);
+      }
+
+      const isFullyVerified = isOwnershipVerified && isDnsConfigured;
+
+      let status: 'pending_verification' | 'verified' | 'failed' = 'pending_verification';
+      if (isFullyVerified) {
+        status = 'verified';
+      } else if (data.error && data.error.code !== 'verification_failed') {
+        status = 'failed';
+      } else {
+        status = 'pending_verification';
+      }
 
       return {
-        success: res.ok || isVerified,
-        verified: isVerified,
-        error: data.error?.message,
-        rawData: data
+        success: true,
+        verified: isFullyVerified,
+        status,
+        error: isFullyVerified ? undefined : (configData?.misconfigured ? 'DNS record belum terhubung ke Vercel' : data.error?.message),
+        rawData: { verify: data, config: configData }
       };
     } catch (err: any) {
       console.error('Vercel verify domain exception:', err);
-      return { success: false, verified: false, error: err.message };
+      return { success: false, verified: false, status: 'pending_verification', error: err.message };
     }
   }
 
@@ -244,7 +297,7 @@ export class VercelClient {
     const projectId = process.env.VERCEL_PROJECT_ID || 'prj_CPiv8zjHnSqrA1Q1wbqJxki43iZp';
 
     if (!this.token) {
-      return { verified: true, status: 'verified' };
+      return { verified: false, status: 'pending_verification' };
     }
 
     try {
@@ -257,10 +310,24 @@ export class VercelClient {
       }
 
       const data = await res.json();
-      const isVerified = Boolean(data.verified);
+      const isOwnershipVerified = Boolean(data.verified);
+
+      let isDnsConfigured = false;
+      try {
+        const confRes = await fetch(`https://api.vercel.com/v6/domains/${encodeURIComponent(domain)}/config`, {
+          headers: { Authorization: `Bearer ${this.token}` }
+        });
+        if (confRes.ok) {
+          const configData = await confRes.json();
+          isDnsConfigured = Boolean(configData && configData.misconfigured === false && configData.configuredBy);
+        }
+      } catch {}
+
+      const isFullyVerified = isOwnershipVerified && isDnsConfigured;
+
       return {
-        verified: isVerified,
-        status: isVerified ? 'verified' : 'pending_verification',
+        verified: isFullyVerified,
+        status: isFullyVerified ? 'verified' : 'pending_verification',
         verification: data.verification
       };
     } catch (err) {

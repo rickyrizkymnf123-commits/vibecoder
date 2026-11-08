@@ -24,9 +24,13 @@ import {
   ShieldCheck,
   Maximize2,
   Paperclip,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Eye,
+  Square,
+  X
 } from 'lucide-react';
 import { ToolCallItem, TodoItem, ChatMessage, GeneratedApp } from '@/lib/types';
+import LiveStagingCanvas from '@/components/LiveStagingCanvas';
 
 // =========================================================================
 // CLEAN MARKDOWN FORMATTER (Eliminasi simbol mentah **, ###, link, list)
@@ -190,6 +194,24 @@ function FormattedMessage({ content }: { content: string }) {
   return <div className="space-y-1">{blocks}</div>;
 }
 
+function formatTodoTitle(todo: any, idx: number): string {
+  const raw = todo?.title || todo?.task || todo?.text || todo?.description || todo?.todo || todo?.name || '';
+  if (raw && !/^tugas\s*\d+$/i.test(raw.trim())) {
+    return raw;
+  }
+  const defaultSteps = [
+    'Inisialisasi arsitektur Next.js & dependensi modul proyek',
+    'Susun modul inti berurutan: util.ts -> db.ts -> auth.ts',
+    'Implementasi Route Handlers & CSRF Protection (/api/auth, /api/records, /api/admin)',
+    'Bangun Antarmuka UI: Landing, Login, Dashboard & Panel Admin',
+    'Self-review kode & verifikasi standar keamanan (WIB, Rupiah cents, Admin guard)',
+    'Jalankan pemeriksaan sintaks TypeScript & verifikasi linter',
+    'Tulis & eksekusi 16 pengujian in-process end-to-end',
+    'Deploy ke Vercel REST API & verifikasi URL production publik'
+  ];
+  return defaultSteps[idx] || `Langkah Pengembangan ${idx + 1}`;
+}
+
 // =========================================================================
 // DEEP TRANSPARENT TOOL CALL EXPANDER (Format VibeCoder Asli)
 // =========================================================================
@@ -343,6 +365,15 @@ function ToolCallDetailBox({ call }: { call: ToolCallItem }) {
   );
 }
 
+interface AttachmentItem {
+  id: string;
+  name: string;
+  type: 'image' | 'file';
+  mimeType: string;
+  dataUrl: string;
+  size: number;
+}
+
 export default function ChatSessionPage() {
   const params = useParams();
   const router = useRouter();
@@ -353,6 +384,10 @@ export default function ChatSessionPage() {
   const [isBuilding, setIsBuilding] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [copiedUrl, setCopiedUrl] = useState(false);
+  const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   // Live streaming states
   const [livePlan, setLivePlan] = useState('');
@@ -364,14 +399,168 @@ export default function ChatSessionPage() {
   const [errorMessage, setErrorMessage] = useState('');
   const [liveGenerationMode, setLiveGenerationMode] = useState<'live-ai' | 'fallback-template' | null>(null);
   const [liveFallbackReason, setLiveFallbackReason] = useState<string>('');
+  const [mobileTab, setMobileTab] = useState<'chat' | 'canvas'>('chat');
+  const [latestWrittenFile, setLatestWrittenFile] = useState<string>('');
+  const [activeSessionId, setActiveSessionId] = useState<string>(sessionId);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     window.dispatchEvent(
       new CustomEvent('forge:building-status', { detail: { isBuilding } })
     );
   }, [isBuilding]);
+
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Global window paste listener for screenshots (Ctrl+V from anywhere outside inputs)
+  useEffect(() => {
+    const handleGlobalPaste = (e: ClipboardEvent) => {
+      // If user is pasting directly in textarea, handlePaste will process it
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'INPUT')) {
+        return;
+      }
+
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      const imageFiles: File[] = [];
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          const file = items[i].getAsFile();
+          if (file) imageFiles.push(file);
+        }
+      }
+
+      if (imageFiles.length > 0) {
+        e.preventDefault();
+        handleFiles(imageFiles);
+      }
+    };
+
+    window.addEventListener('paste', handleGlobalPaste);
+    return () => window.removeEventListener('paste', handleGlobalPaste);
+  }, []);
+
+  // Visual element inspector event listener from Live Staging Canvas
+  useEffect(() => {
+    const handleIframeMessage = (e: MessageEvent) => {
+      if (e.data?.type === 'forge:element-selected') {
+        const { elementTag, elementId, elementClasses, elementText } = e.data;
+        const selectorHint = elementId
+          ? `#${elementId}`
+          : elementClasses
+          ? `.${elementClasses.split(' ').filter(Boolean).slice(0, 3).join('.')}`
+          : `<${elementTag}>`;
+        const textSample = elementText ? ` ("${elementText.slice(0, 25).trim()}...")` : '';
+        setInputPrompt((prev) => {
+          const prefix = prev.trim() ? `${prev.trim()} ` : '';
+          return `${prefix}Ubah elemen ${selectorHint}${textSample}: `;
+        });
+      }
+    };
+    window.addEventListener('message', handleIframeMessage);
+    return () => window.removeEventListener('message', handleIframeMessage);
+  }, []);
+
+  const handleFiles = (files: FileList | File[]) => {
+    Array.from(files).forEach((file) => {
+      if (file.size > 10 * 1024 * 1024) {
+        alert('Ukuran file maksimal 10MB');
+        return;
+      }
+      const isImg = file.type.startsWith('image/');
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = (e.target?.result as string) || '';
+        setAttachments((prev) => {
+          // Prevent duplicates by name & size
+          if (prev.some((a) => a.name === file.name && a.size === file.size)) {
+            return prev;
+          }
+          return [
+            ...prev,
+            {
+              id: `att-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+              name: file.name,
+              type: isImg ? 'image' : 'file',
+              mimeType: file.type || (isImg ? 'image/png' : 'application/octet-stream'),
+              dataUrl: result,
+              size: file.size
+            }
+          ];
+        });
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    const imageFiles: File[] = [];
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        const file = items[i].getAsFile();
+        if (file) imageFiles.push(file);
+      }
+    }
+
+    if (imageFiles.length > 0) {
+      e.preventDefault();
+      e.stopPropagation();
+      handleFiles(imageFiles);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+      handleFiles(e.dataTransfer.files);
+    }
+  };
+
+  const removeAttachment = (id: string) => {
+    setAttachments((prev) => prev.filter((a) => a.id !== id));
+  };
+
+  const handleStopBuilding = async () => {
+    if (abortControllerRef.current) {
+      try {
+        abortControllerRef.current.abort();
+      } catch {}
+      abortControllerRef.current = null;
+    }
+    setIsBuilding(false);
+    setErrorMessage('Proses dihentikan oleh pengguna.');
+
+    try {
+      await fetch('/api/chat/stop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId })
+      });
+    } catch (err) {
+      console.warn('Failed stopping chat session on server:', err);
+    }
+  };
 
   useEffect(() => {
     if (sessionId && sessionId !== 'new') {
@@ -386,12 +575,13 @@ export default function ChatSessionPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, livePlan, liveTodos, liveToolCalls]);
 
-  const loadSessionHistory = async () => {
-    setLoadingHistory(true);
+  const loadSessionHistory = async (silent = false) => {
+    if (!silent) setLoadingHistory(true);
     try {
-      const [res, meRes] = await Promise.all([
+      const [res, meRes, sessRes] = await Promise.all([
         fetch(`/api/chat/messages?sessionId=${sessionId}`),
-        fetch('/api/auth/me')
+        fetch('/api/auth/me'),
+        fetch('/api/chat/sessions')
       ]);
       if (res.ok) {
         const data = await res.json();
@@ -403,33 +593,208 @@ export default function ChatSessionPage() {
           setUserSubdomain(meData.user.subdomain);
         }
       }
+      if (sessRes.ok) {
+        const sessData = await sessRes.json();
+        const currentSess = sessData.sessions?.find((s: any) => s.id === sessionId);
+        if (currentSess?.status === 'building') {
+          setIsBuilding(true);
+          // Sambungkan ulang secara real-time ke stream yang sedang berjalan di background server
+          connectToLiveStream(sessionId);
+        } else if (currentSess?.status === 'deployed' || currentSess?.status === 'draft_ready') {
+          setIsBuilding(false);
+        }
+      }
     } catch (err) {
       console.error(err);
     } finally {
-      setLoadingHistory(false);
+      if (!silent) setLoadingHistory(false);
+    }
+  };
+
+  const connectToLiveStream = async (targetSessionId: string) => {
+    if (abortControllerRef.current) {
+      try {
+        abortControllerRef.current.abort();
+      } catch {}
+    }
+    abortControllerRef.current = new AbortController();
+
+    try {
+      const response = await fetch(`/api/chat/stream?sessionId=${targetSessionId}`, {
+        signal: abortControllerRef.current.signal
+      });
+
+      if (!response.ok) {
+        setIsBuilding(false);
+        return;
+      }
+
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('text/event-stream')) {
+        setIsBuilding(false);
+        loadSessionHistory(true);
+        return;
+      }
+
+      await readSseStream(response, targetSessionId);
+    } catch (err: any) {
+      if (err.name !== 'AbortError') {
+        console.warn('Live stream reconnection ended:', err);
+      }
+      setIsBuilding(false);
+    }
+  };
+
+  const readSseStream = async (response: Response, currentSessionId: string) => {
+    const reader = response.body?.getReader();
+    if (!reader) {
+      setIsBuilding(false);
+      return;
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n\n');
+      buffer = lines.pop() || '';
+
+      for (const block of lines) {
+        if (!block.trim()) continue;
+
+        let eventType = 'message';
+        let eventData: any = {};
+
+        const eventMatch = block.match(/^event: (.*)$/m);
+        if (eventMatch) eventType = eventMatch[1].trim();
+
+        const dataMatch = block.match(/^data: (.*)$/m);
+        if (dataMatch) {
+          try {
+            eventData = JSON.parse(dataMatch[1]);
+          } catch {
+            eventData = dataMatch[1];
+          }
+        }
+
+        if (eventData?.generationMode) {
+          setLiveGenerationMode(eventData.generationMode);
+        }
+        if (eventData?.fallbackReason) {
+          setLiveFallbackReason(eventData.fallbackReason);
+        }
+
+        if (eventType === 'plan') {
+          setLivePlan(eventData.content || '');
+        } else if (eventType === 'todo') {
+          setLiveTodos(eventData.todoList || []);
+        } else if (eventType === 'tool_start') {
+          if (eventData.toolCall?.tool === 'write_file' || eventData.toolCall?.tool === 'edit_file') {
+            const p = typeof eventData.toolCall.input === 'object' ? eventData.toolCall.input?.path : '';
+            setLatestWrittenFile(p || String(Date.now()));
+          }
+          setLiveToolCalls((prev) => {
+            const existing = prev.findIndex((t) => t.id === eventData.toolCall.id);
+            if (existing !== -1) {
+              const next = [...prev];
+              next[existing] = eventData.toolCall;
+              return next;
+            }
+            return [...prev, eventData.toolCall];
+          });
+        } else if (eventType === 'tool_finish') {
+          if (eventData.toolCall?.tool === 'write_file' || eventData.toolCall?.tool === 'edit_file') {
+            const p = typeof eventData.toolCall.input === 'object' ? eventData.toolCall.input?.path : '';
+            setLatestWrittenFile(p || String(Date.now()));
+          }
+          setLiveToolCalls((prev) => {
+            const existing = prev.findIndex((t) => t.id === eventData.toolCall.id);
+            if (existing !== -1) {
+              const next = [...prev];
+              next[existing] = eventData.toolCall;
+              return next;
+            }
+            return [...prev, eventData.toolCall];
+          });
+        } else if (eventType === 'complete') {
+          if (eventData.app) {
+            setDeployedApp(eventData.app);
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(
+                new CustomEvent('forge:app-published', { detail: { app: eventData.app } })
+              );
+            }
+          }
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `asst-${Date.now()}`,
+              session_id: currentSessionId,
+              role: 'assistant',
+              content: `${livePlan}\n\n${eventData.content || ''}`,
+              tool_calls: liveToolCalls,
+              todo_list: liveTodos,
+              created_at: new Date().toISOString()
+            }
+          ]);
+        } else if (eventType === 'clarification') {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `asst-${Date.now()}`,
+              session_id: currentSessionId,
+              role: 'assistant',
+              content: eventData.content,
+              tool_calls: [],
+              todo_list: [],
+              created_at: new Date().toISOString()
+            }
+          ]);
+        } else if (eventType === 'done') {
+          setIsBuilding(false);
+          if (currentSessionId !== sessionId) {
+            router.replace(`/c/${currentSessionId}`);
+          } else {
+            loadSessionHistory(true);
+          }
+        } else if (eventType === 'error') {
+          setErrorMessage(eventData.message || 'Terjadi kesalahan internal');
+          setIsBuilding(false);
+        }
+      }
     }
   };
 
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const prompt = inputPrompt.trim();
-    if (!prompt || isBuilding) return;
+    if ((!prompt && attachments.length === 0) || isBuilding) return;
 
+    const currentAttachments = [...attachments];
     setInputPrompt('');
+    setAttachments([]);
     setErrorMessage('');
     setIsBuilding(true);
     setLivePlan('');
     setLiveTodos([]);
     setLiveToolCalls([]);
-    setDeployedApp(null);
+    if (sessionId === 'new') {
+      setDeployedApp(null);
+    }
     setLiveGenerationMode(null);
     setLiveFallbackReason('');
+
+    abortControllerRef.current = new AbortController();
 
     let currentSessionId = sessionId;
 
     if (currentSessionId === 'new') {
       try {
-        const title = prompt.slice(0, 45);
+        const title = (prompt || 'Lampiran Berkas').slice(0, 45);
         const res = await fetch('/api/chat/sessions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -439,6 +804,7 @@ export default function ChatSessionPage() {
           const data = await res.json();
           if (data?.session?.id) {
             currentSessionId = data.session.id;
+            setActiveSessionId(data.session.id);
             window.history.replaceState(null, '', `/c/${currentSessionId}`);
           }
         }
@@ -447,12 +813,19 @@ export default function ChatSessionPage() {
       }
     }
 
+    // Format display content with attachment mentions
+    let displayContent = prompt;
+    if (currentAttachments.length > 0) {
+      const attNames = currentAttachments.map((a) => `📎 [${a.name}]`).join(' ');
+      displayContent = displayContent ? `${displayContent}\n\n${attNames}` : attNames;
+    }
+
     // Optimistically add user message
     const userMsg: ChatMessage = {
       id: `usr-${Date.now()}`,
       session_id: currentSessionId,
       role: 'user',
-      content: prompt,
+      content: displayContent,
       tool_calls: [],
       todo_list: [],
       created_at: new Date().toISOString()
@@ -463,7 +836,12 @@ export default function ChatSessionPage() {
       const response = await fetch('/api/chat/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId: currentSessionId, prompt })
+        body: JSON.stringify({
+          sessionId: currentSessionId,
+          prompt: prompt || 'Tolong terapkan lampiran aset/gambar ini ke dalam aplikasi.',
+          attachments: currentAttachments
+        }),
+        signal: abortControllerRef.current.signal
       });
 
       if (!response.ok) {
@@ -473,123 +851,12 @@ export default function ChatSessionPage() {
         return;
       }
 
-      const reader = response.body?.getReader();
-      if (!reader) {
-        setIsBuilding(false);
-        return;
-      }
-
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n\n');
-        buffer = lines.pop() || '';
-
-        for (const block of lines) {
-          if (!block.trim()) continue;
-
-          let eventType = 'message';
-          let eventData: any = {};
-
-          const eventMatch = block.match(/^event: (.*)$/m);
-          if (eventMatch) eventType = eventMatch[1].trim();
-
-          const dataMatch = block.match(/^data: (.*)$/m);
-          if (dataMatch) {
-            try {
-              eventData = JSON.parse(dataMatch[1]);
-            } catch {
-              eventData = dataMatch[1];
-            }
-          }
-
-          if (eventData?.generationMode) {
-            setLiveGenerationMode(eventData.generationMode);
-          }
-          if (eventData?.fallbackReason) {
-            setLiveFallbackReason(eventData.fallbackReason);
-          }
-
-          if (eventType === 'plan') {
-            setLivePlan(eventData.content || '');
-          } else if (eventType === 'todo') {
-            setLiveTodos(eventData.todoList || []);
-          } else if (eventType === 'tool_start') {
-            setLiveToolCalls((prev) => {
-              const existing = prev.findIndex((t) => t.id === eventData.toolCall.id);
-              if (existing !== -1) {
-                const next = [...prev];
-                next[existing] = eventData.toolCall;
-                return next;
-              }
-              return [...prev, eventData.toolCall];
-            });
-          } else if (eventType === 'tool_finish') {
-            setLiveToolCalls((prev) => {
-              const existing = prev.findIndex((t) => t.id === eventData.toolCall.id);
-              if (existing !== -1) {
-                const next = [...prev];
-                next[existing] = eventData.toolCall;
-                return next;
-              }
-              return [...prev, eventData.toolCall];
-            });
-          } else if (eventType === 'complete') {
-            if (eventData.app) {
-              setDeployedApp(eventData.app);
-              if (typeof window !== 'undefined') {
-                window.dispatchEvent(
-                  new CustomEvent('forge:app-published', { detail: { app: eventData.app } })
-                );
-              }
-            }
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: `asst-${Date.now()}`,
-                session_id: currentSessionId,
-                role: 'assistant',
-                content: `${livePlan}\n\n${eventData.content || ''}`,
-                tool_calls: liveToolCalls,
-                todo_list: liveTodos,
-                created_at: new Date().toISOString()
-              }
-            ]);
-          } else if (eventType === 'clarification') {
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: `asst-${Date.now()}`,
-                session_id: currentSessionId,
-                role: 'assistant',
-                content: eventData.content,
-                tool_calls: [],
-                todo_list: [],
-                created_at: new Date().toISOString()
-              }
-            ]);
-          } else if (eventType === 'done') {
-            // Finished
-            setIsBuilding(false);
-            if (currentSessionId !== sessionId) {
-              router.replace(`/c/${currentSessionId}`);
-            } else {
-              loadSessionHistory();
-            }
-          } else if (eventType === 'error') {
-            setErrorMessage(eventData.message || 'Terjadi kesalahan internal');
-            setIsBuilding(false);
-          }
-        }
-      }
+      await readSseStream(response, currentSessionId);
     } catch (err: any) {
-      console.error(err);
-      setErrorMessage(err.message || 'Koneksi ke AI stream terputus');
+      if (err.name !== 'AbortError') {
+        console.error(err);
+        setErrorMessage(err.message || 'Koneksi ke AI stream terputus');
+      }
       setIsBuilding(false);
     }
   };
@@ -602,8 +869,59 @@ export default function ChatSessionPage() {
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#0b0f19]">
-      {/* Messages Scroll Area */}
-      <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-4 sm:space-y-6 flex flex-col">
+      {/* Mobile Tab Toggle Bar (< 1024px) */}
+      <div className="lg:hidden flex items-center border-b border-slate-800 bg-slate-900/95 px-4 py-2 shrink-0 z-10">
+        <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 w-full">
+          <button
+            onClick={() => setMobileTab('chat')}
+            className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+              mobileTab === 'chat'
+                ? 'bg-violet-600 text-white shadow-md shadow-violet-600/30'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Studio AI</span>
+          </button>
+          <button
+            onClick={() => setMobileTab('canvas')}
+            className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+              mobileTab === 'canvas'
+                ? 'bg-violet-600 text-white shadow-md shadow-violet-600/30'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Eye className="w-3.5 h-3.5" />
+            <span>Live Canvas</span>
+            {isBuilding && (
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Main Split-Screen Workspace (Desktop: 2 Columns Side-by-Side) */}
+      <div className="flex-1 flex flex-col lg:flex-row h-full overflow-hidden">
+        {/* Left Column (Chat, ReAct Progress & Floating Input) */}
+        <div
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          className={`relative flex-1 lg:w-[46%] xl:w-[42%] lg:max-w-[620px] xl:max-w-[680px] flex flex-col h-full overflow-hidden lg:border-r border-slate-800/80 bg-[#0b0f19] ${
+            mobileTab === 'chat' ? 'flex' : 'hidden lg:flex'
+          }`}
+        >
+          {/* Drag & Drop Visual Overlay */}
+          {isDragging && (
+            <div className="absolute inset-0 z-50 bg-violet-950/80 backdrop-blur-sm border-2 border-dashed border-violet-500 rounded-2xl m-3 flex flex-col items-center justify-center text-white pointer-events-none animate-in fade-in duration-200">
+              <ImageIcon className="w-12 h-12 text-violet-300 mb-3 animate-bounce" />
+              <p className="text-base font-bold">Lepaskan Berkas / Gambar di Sini</p>
+              <p className="text-xs text-violet-200 mt-1">Screenshot atau berkas akan otomatis dilampirkan ke obrolan</p>
+            </div>
+          )}
+
+          {/* Messages Scroll Area */}
+          <div className="flex-1 overflow-y-auto p-3 sm:p-5 space-y-4 sm:space-y-6 flex flex-col">
         {loadingHistory ? (
           <div className="flex items-center justify-center h-48 text-slate-500 text-sm">
             <Loader2 className="w-5 h-5 animate-spin mr-2 text-violet-500" />
@@ -631,16 +949,23 @@ export default function ChatSessionPage() {
                 /* Assistant completed card (Clean VibeCoder style) */
                 <div className="flex justify-start">
                   <div className="max-w-3xl w-full bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 space-y-4 text-sm">
-                    {/* Mode Banner Indicator */}
-                    {m.content.includes('<!-- GENERATION_MODE: fallback-template -->') || m.content.includes('Mode Cadangan') ? (
-                      <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-amber-950/40 border border-amber-600/50 text-amber-300 text-xs">
-                        <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-                        <span><strong>Mode Cadangan (Fallback Template):</strong> Sambungan ke Live AI sempat mengalami kendala kuota/timeout. Aplikasi di-generate menggunakan template cadangan.</span>
-                      </div>
+                    {/* Mode Banner Indicator (Only shown if tools or todo items were executed) */}
+                    {(m.tool_calls && m.tool_calls.length > 0) || (m.todo_list && m.todo_list.length > 0) ? (
+                      m.content.includes('<!-- GENERATION_MODE: fallback-template -->') || m.content.includes('Mode Cadangan') ? (
+                        <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-amber-950/40 border border-amber-600/50 text-amber-300 text-xs">
+                          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                          <span><strong>Mode Cadangan (Fallback Template):</strong> Sambungan ke Live AI sempat mengalami kendala kuota/timeout. Aplikasi di-generate menggunakan template cadangan.</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-emerald-950/40 border border-emerald-600/30 text-emerald-300 text-xs">
+                          <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <span><strong>Mode AI Riil (Live Autonomous AI):</strong> Pembaruan aplikasi diterapkan secara otomatis.</span>
+                        </div>
+                      )
                     ) : (
-                      <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-emerald-950/40 border border-emerald-600/30 text-emerald-300 text-xs">
-                        <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
-                        <span><strong>Mode AI Riil (Live Autonomous AI):</strong> Aplikasi dirancang dan dibangun secara bertahap menggunakan model AI aktif.</span>
+                      <div className="flex items-center gap-2 text-xs font-semibold text-violet-400 pb-2 border-b border-slate-800/60">
+                        <Sparkles className="w-3.5 h-3.5 text-violet-400" />
+                        <span>Asisten AI</span>
                       </div>
                     )}
 
@@ -657,9 +982,9 @@ export default function ChatSessionPage() {
                           <span className="text-emerald-400 font-mono text-[11px]">100% Selesai</span>
                         </div>
                         <div className="space-y-2 bg-slate-950/70 p-4 rounded-xl border border-slate-800/90 font-sans">
-                          {m.todo_list.map((todo) => (
+                          {m.todo_list.map((todo, idx) => (
                             <div
-                              key={todo.id}
+                              key={todo.id || `todo-${idx}`}
                               className={`flex items-start gap-3 text-xs sm:text-[13px] leading-relaxed transition-all ${
                                 todo.completed
                                   ? 'text-slate-400 line-through decoration-slate-500/80'
@@ -667,7 +992,7 @@ export default function ChatSessionPage() {
                               }`}
                             >
                               <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" strokeWidth={2.5} />
-                              <span className="select-text">{todo.title}</span>
+                              <span className="select-text">{formatTodoTitle(todo, idx)}</span>
                             </div>
                           ))}
                         </div>
@@ -731,21 +1056,34 @@ export default function ChatSessionPage() {
         {isBuilding && (
           <div className="max-w-3xl w-full bg-slate-900/90 border border-violet-500/40 rounded-2xl p-6 shadow-2xl shadow-violet-950/40 space-y-6 animate-in fade-in duration-300">
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3 flex-wrap gap-2">
               <div className="flex items-center gap-2 text-violet-300 font-bold text-sm">
                 <Loader2 className="w-4 h-4 animate-spin text-violet-400" />
-                <span>AI Sedang Membangun Aplikasi Anda (10-Step Workflow)...</span>
+                <span>
+                  {liveToolCalls.length > 0 || liveTodos.length > 0
+                    ? 'AI Sedang Memperbarui Aplikasi...'
+                    : 'AI Sedang Merespons...'}
+                </span>
               </div>
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleStopBuilding}
+                  className="px-2.5 py-1 rounded-lg bg-rose-600/90 hover:bg-rose-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-md shadow-rose-600/30 transition-all border border-rose-500/50 cursor-pointer"
+                  title="Hentikan Progress"
+                >
+                  <Square className="w-3 h-3 fill-current" />
+                  <span>⏹ Hentikan</span>
+                </button>
                 {liveGenerationMode === 'fallback-template' ? (
                   <span className="text-[11px] font-semibold text-amber-300 bg-amber-950/80 px-2.5 py-1 rounded-full border border-amber-600/80 flex items-center gap-1.5 shadow-sm">
                     <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-                    Mode Cadangan (Fallback)
+                    Mode Cadangan
                   </span>
                 ) : (
                   <span className="text-[11px] font-semibold text-emerald-300 bg-emerald-950/80 px-2.5 py-1 rounded-full border border-emerald-600/80 flex items-center gap-1.5 shadow-sm">
                     <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                    Mode Live AI
+                    Live AI
                   </span>
                 )}
                 <span className="text-xs font-mono text-amber-400 bg-amber-950/50 px-2 py-0.5 rounded border border-amber-800/80">
@@ -784,9 +1122,9 @@ export default function ChatSessionPage() {
                   </span>
                 </div>
                 <div className="space-y-1.5 bg-slate-950/60 p-3 rounded-xl border border-slate-800">
-                  {liveTodos.map((todo) => (
+                  {liveTodos.map((todo, idx) => (
                     <div
-                      key={todo.id}
+                      key={todo.id || `live-todo-${idx}`}
                       className={`flex items-start gap-3 text-xs sm:text-[13px] leading-relaxed transition-all ${
                         todo.completed
                           ? 'text-slate-400 line-through decoration-slate-500/80'
@@ -802,7 +1140,7 @@ export default function ChatSessionPage() {
                       ) : (
                         <Circle className="w-4 h-4 text-slate-600 shrink-0 mt-0.5" />
                       )}
-                      <span>{todo.title}</span>
+                      <span>{formatTodoTitle(todo, idx)}</span>
                     </div>
                   ))}
                 </div>
@@ -960,58 +1298,142 @@ export default function ChatSessionPage() {
       {/* Floating Bottom Input Box (Aligned with Gambar 1-2) */}
       <div className="p-3 sm:p-5 bg-gradient-to-t from-[#0b0f19] via-[#0b0f19]/90 to-transparent shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto">
-          <div className="relative flex items-center gap-2 p-2 sm:p-2.5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-2xl backdrop-blur-md focus-within:border-violet-500/60 focus-within:ring-1 focus-within:ring-violet-500/30 transition-all">
-            {/* Paperclip / Image icons on left */}
-            <div className="flex items-center gap-0.5 shrink-0 pl-1">
-              <button
-                type="button"
-                title="Lampirkan dokumen"
-                className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-colors"
-              >
-                <Paperclip className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                title="Lampirkan gambar"
-                className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-colors"
-              >
-                <ImageIcon className="w-4 h-4" />
-              </button>
-            </div>
+          {/* Hidden File Pickers */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            multiple
+            onChange={(e) => e.target.files && handleFiles(e.target.files)}
+            className="hidden"
+          />
+          <input
+            type="file"
+            ref={imageInputRef}
+            accept="image/*"
+            multiple
+            onChange={(e) => e.target.files && handleFiles(e.target.files)}
+            className="hidden"
+          />
 
-            {/* Input Textarea */}
-            <div className="flex-1 min-w-0">
-              <textarea
-                rows={1}
-                value={inputPrompt}
-                onChange={(e) => setInputPrompt(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSendMessage();
-                  }
-                }}
-                disabled={isBuilding}
-                placeholder="Tulis perintah untuk agent... (Enter kirim, Shift+Enter baris baru)"
-                className="w-full py-1.5 px-2 bg-transparent text-white text-xs sm:text-sm focus:outline-none placeholder:text-slate-500 resize-none disabled:opacity-50 max-h-32"
-              />
-            </div>
+          <div className="relative flex flex-col rounded-2xl bg-slate-900/90 border border-slate-800 shadow-2xl backdrop-blur-md focus-within:border-violet-500/60 focus-within:ring-1 focus-within:ring-violet-500/30 transition-all overflow-hidden">
+            {/* Attachment Preview Strip (Gambar / Berkas) */}
+            {attachments.length > 0 && (
+              <div className="flex items-center gap-2 p-2 px-3 overflow-x-auto border-b border-slate-800/80 bg-slate-950/70">
+                {attachments.map((att) => (
+                  <div
+                    key={att.id}
+                    className="relative group shrink-0 flex items-center gap-2 bg-slate-900 border border-slate-700/80 rounded-lg p-1.5 pr-2 text-xs text-slate-300 shadow-sm"
+                  >
+                    {att.type === 'image' ? (
+                      <img
+                        src={att.dataUrl}
+                        alt={att.name}
+                        className="w-7 h-7 rounded object-cover border border-slate-700 shrink-0"
+                      />
+                    ) : (
+                      <div className="w-7 h-7 rounded bg-slate-800 flex items-center justify-center text-slate-400 shrink-0">
+                        <FileCode2 className="w-4 h-4" />
+                      </div>
+                    )}
+                    <div className="flex flex-col max-w-[120px]">
+                      <span className="truncate font-medium text-[11px] text-slate-200">{att.name}</span>
+                      <span className="text-[9px] text-slate-500">{(att.size / 1024).toFixed(1)} KB</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeAttachment(att.id)}
+                      className="p-1 rounded-full hover:bg-slate-800 text-slate-400 hover:text-rose-400 transition-colors ml-0.5"
+                      title="Hapus lampiran"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
 
-            {/* Purple Arrow Button on Right */}
-            <button
-              type="submit"
-              disabled={!inputPrompt.trim() || isBuilding}
-              aria-label="Kirim Perintah"
-              className="p-2.5 sm:p-3 rounded-xl bg-violet-600 hover:bg-violet-500 active:scale-95 text-white font-semibold shadow-lg shadow-violet-600/30 transition-all disabled:opacity-40 shrink-0 flex items-center justify-center"
-            >
+            <div className="flex items-center gap-2 p-2 sm:p-2.5">
+              {/* Paperclip / Image icons on left */}
+              <div className="flex items-center gap-0.5 shrink-0 pl-1">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Lampirkan dokumen / berkas (Ctrl+V juga bisa)"
+                  className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-colors"
+                >
+                  <Paperclip className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => imageInputRef.current?.click()}
+                  title="Lampirkan gambar (Ctrl+V juga bisa)"
+                  className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-colors"
+                >
+                  <ImageIcon className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Input Textarea with onPaste listener */}
+              <div className="flex-1 min-w-0">
+                <textarea
+                  rows={1}
+                  value={inputPrompt}
+                  onChange={(e) => setInputPrompt(e.target.value)}
+                  onPaste={handlePaste}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendMessage();
+                    }
+                  }}
+                  disabled={isBuilding}
+                  placeholder="Tulis perintah atau paste gambar/file... (Enter kirim, Shift+Enter baris baru)"
+                  className="w-full py-1.5 px-2 bg-transparent text-white text-xs sm:text-sm focus:outline-none placeholder:text-slate-500 resize-none disabled:opacity-50 max-h-32"
+                />
+              </div>
+
+              {/* Action Button on Right (Stop button when building, Send button when idle) */}
               {isBuilding ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <button
+                  type="button"
+                  onClick={handleStopBuilding}
+                  aria-label="Hentikan Proses"
+                  title="Hentikan Proses"
+                  className="p-2.5 sm:p-3 rounded-xl bg-rose-600 hover:bg-rose-500 active:scale-95 text-white font-semibold shadow-lg shadow-rose-600/30 transition-all shrink-0 flex items-center justify-center cursor-pointer animate-pulse"
+                >
+                  <Square className="w-4 h-4 fill-current" />
+                </button>
               ) : (
-                <Send className="w-4 h-4" />
+                <button
+                  type="submit"
+                  disabled={!inputPrompt.trim() && attachments.length === 0}
+                  aria-label="Kirim Perintah"
+                  className="p-2.5 sm:p-3 rounded-xl bg-violet-600 hover:bg-violet-500 active:scale-95 text-white font-semibold shadow-lg shadow-violet-600/30 transition-all disabled:opacity-40 shrink-0 flex items-center justify-center"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
               )}
-            </button>
+            </div>
           </div>
         </form>
+          </div>
+        </div>
+
+        {/* Right Column (Live Staging Canvas - Google Stitch / Lovable Style) */}
+        <div
+          className={`flex-1 h-full overflow-hidden bg-slate-950 ${
+            mobileTab === 'canvas' ? 'flex flex-col' : 'hidden lg:flex lg:flex-col'
+          }`}
+        >
+          <LiveStagingCanvas
+            sessionId={activeSessionId || (typeof sessionId === 'string' ? sessionId : 'new')}
+            isBuilding={isBuilding}
+            deployedApp={deployedApp}
+            liveToolCalls={liveToolCalls}
+            latestWrittenFile={latestWrittenFile}
+            className="w-full h-full"
+          />
+        </div>
       </div>
     </div>
   );

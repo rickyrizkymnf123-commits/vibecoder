@@ -1,15 +1,15 @@
 import { NextRequest } from 'next/server';
-import { getCurrentUser } from '@/lib/auth/session';
+import { requireAdminSession } from '@/lib/auth/admin-guard';
 import { getAiConfig } from '@/lib/ai/config';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getCurrentUser();
-    if (!session) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
+    const auth = await requireAdminSession();
+    if (!auth.authorized) {
+      return new Response(JSON.stringify({ error: 'Akses ditolak. Fitur uji AI khusus Administrator.' }), {
+        status: auth.status,
         headers: { 'Content-Type': 'application/json' }
       });
     }
@@ -59,8 +59,8 @@ export async function POST(req: NextRequest) {
             content: prompt
           }
         ],
-        temperature: 0.7,
-        max_tokens: 800
+        max_tokens: 500,
+        temperature: 0.7
       })
     });
 
@@ -68,39 +68,38 @@ export async function POST(req: NextRequest) {
 
     if (!response.ok) {
       const errText = await response.text();
-      let errorMsg = `Provider error (${response.status})`;
+      let parsedErr = errText;
       try {
-        const errJson = JSON.parse(errText);
-        errorMsg = errJson.error?.message || errJson.message || errorMsg;
-      } catch {
-        errorMsg = errText.substring(0, 200) || errorMsg;
-      }
-      return new Response(JSON.stringify({ success: false, error: errorMsg, latencyMs }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
+        const j = JSON.parse(errText);
+        parsedErr = j.error?.message || j.error || j.message || errText;
+      } catch {}
+
+      return new Response(
+        JSON.stringify({
+          error: `Provider error (${response.status}): ${parsedErr}`,
+          latencyMs
+        }),
+        { status: response.status, headers: { 'Content-Type': 'application/json' } }
+      );
     }
 
     const data = await response.json();
-    const reply = data.choices?.[0]?.message?.content || '(Tidak ada respons teks dari model)';
-    const actualModel = data.model || model;
-    const usage = data.usage || null;
+    const reply = data.choices?.[0]?.message?.content || '(Jawaban kosong dari model)';
 
     return new Response(
       JSON.stringify({
         success: true,
         reply,
-        model: actualModel,
+        model: data.model || model,
         latencyMs,
-        usage
+        usage: data.usage
       }),
       { status: 200, headers: { 'Content-Type': 'application/json' } }
     );
   } catch (err: any) {
     return new Response(
       JSON.stringify({
-        success: false,
-        error: err.name === 'TimeoutError' ? 'Koneksi ke AI Provider timeout (30s)' : (err.message || 'Gagal menghubungi AI Provider')
+        error: `Gagal menghubungi endpoint AI: ${err.message}`
       }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );

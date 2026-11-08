@@ -4,7 +4,12 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'Kilat Tools — Bangun & Publish Aplikasi Web Secepat Kilat Lewat Chat AI',
   description: 'Platform AI SaaS App Generator super cepat. Cukup deskripsikan aplikasi dalam bahasa natural, AI Kilat Tools akan merencanakan, membangun modul, menguji skenario in-process, dan mem-publish live ke URL publik secara instan.',
-  keywords: ['kilat tools', 'ai app builder', 'vibecoder', 'nextjs', 'supabase', 'vercel']
+  keywords: ['kilat tools', 'ai app builder', 'vibecoder', 'nextjs', 'supabase', 'vercel'],
+  icons: {
+    icon: '/icon.svg',
+    shortcut: '/icon.svg',
+    apple: '/icon.svg',
+  }
 };
 
 export default function RootLayout({

@@ -109,8 +109,10 @@ export function KilatLogo({ size = 'md', showText = true, className = '' }: Kila
             />
           </svg>
 
-          {/* Subtle cyan electric dot */}
-          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse ml-1.5 shrink-0" />
+          {/* Subtle cyan electric dot for medium/large sizes */}
+          {size !== 'sm' && (
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse ml-1.5 shrink-0" />
+          )}
         </div>
       )}
     </div>

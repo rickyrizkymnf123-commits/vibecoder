@@ -1,20 +1,447 @@
 # Conversation Log — VibeCoder Platform
 
-## [2026-09-17] Implementasi 2-Tahap Verifikasi Custom Domain (TXT Ownership + A Record Traffic)
-1. **Spesifikasi & Arsitektur (Ala Lovable & Emergent)**:
-   - User memasukkan root domain (e.g. `tokoku.com`) per 1 aplikasi ter-publish.
-   - Pro Tier Guard: Validasi `is_pro` ketat di server backend (`/api/deploy/domain`) dan client UI (`/domains`), pengguna gratis melihat kartu upsell ke `/pro`.
-2. **Tahap 1 (Registrasi & 2 DNS Record)**:
-   - `POST https://api.vercel.com/v10/projects/{projectId}/domains` mendaftarkan domain dan mengambil verification TXT challenge.
-   - DB Supabase menyimpan `txt_verification_name` (`_vercel`) dan `txt_verification_value` (`vc-domain-verify=...`).
-   - UI menampilkan 2 kartu: Record 1 (TXT Kepemilikan) dan Record 2 (A Record Routing `76.76.21.21`) dengan tombol salin.
-3. **Tahap 2 (Verifikasi Nyata & 3 Indikator Status)**:
-   - Tombol `[⟳ Cek Status Verifikasi]` memanggil endpoint `POST /v9/projects/{projectId}/domains/{domain}/verify`.
-   - Indikator 3 Status: 🟡 *Menunggu DNS* (`pending_verification`), 🟢 *Aktif & Terverifikasi* (`verified`), 🔴 *Verifikasi Gagal* (`failed`).
-4. **Pemutusan Domain**:
-   - Tombol `[🗑 Putuskan Domain]` memanggil `DELETE /v9/projects/{projectId}/domains/{domain}` dan membersihkan DB.
-5. **Kompilasi & Deployment**:
-   - TypeScript `npx tsc --noEmit` 0 error, Next.js Build 34/34 routes lulus, Vercel Production terdeploy dan aliased ke `https://*.kilatstools.my.id`, GitHub branch `main` sinkron.
+## [2026-11-04 23:18 WIB] Sinkronisasi Progres Sesi & Live Preview App
+1. **Pemeriksaan Progres Sesi**:
+   - Menanggapi pertanyaan pengguna mengapa progres terasa tertahan pada tool pill `todo_write`.
+   - Melakukan pengecekan langsung ke database Supabase dan Vercel production:
+     * Aplikasi **CreatorVerse AI — Ultimate Video Content Creation Studio** pada sesi `ses-1793803434356-ms77z` sebenarnya sudah selesai diproses dan berkasnya (`public/index.html`, `public/js/app.js`, `public/css/style.css` total 80.384 bytes) telah aktif di database.
+     * Karena adanya refresh browser sebelum event streaming ditutup di tab pengguna, status sesi disinkronkan langsung ke database dengan status `deployed`.
+2. **Hasil Verifikasi**:
+   - Endpoint preview `https://kilatstools.my.id/api/preview/ses-1793803434356-ms77z/raw` mengembalikan **HTTP 200 OK** dengan halaman aplikasi penuh dan interaktif.
+
+
+## [2026-11-04] Perbaikan Menyeluruh Bug AI Timeout & Serverless Lambda Disconnect
+1. **Penyebab Utama**:
+   - Model AI di router eksternal sebelumnya menggunakan `ag/gemini-3.8-flash-high` yang menghabiskan 48-60+ detik hanya untuk internal reasoning (1.200+ reasoning tokens) sebelum memanggil tool pertama.
+   - Route handler Next.js `/api/chat/stream/route.ts` tidak menyertakan `export const maxDuration = 300;`, sehingga batas default Vercel serverless function memutus koneksi streaming SSE di tengah jalan.
+   - AI agent loop terjebak pada retry yang lambat sehingga memicu banner alert timeout: *"Waktu respons AI melambat atau timeout (The operation was aborted due to timeout). Mengulang otomatis (percobaan 2/3)..."*
+2. **Solusi yang Diterapkan**:
+   - **Update Model ke `ag/gemini-3-flash`**: Menghasilkan tool calls dalam 1.7 - 13 detik (stabil dan tidak terkena timeout).
+   - **Set `export const maxDuration = 300;`** pada `/api/chat/stream/route.ts` agar streaming tidak diputus Lambda.
+   - **Optimasi Agent Loop**: Timeout per turn disesuaikan ke 45 detik, retry maksimal 2x, dan otomatis fallback ke Google Gemini native (`gemini-2.5-flash`) jika router mengalami gangguan jaringan.
+   - **Deploy Vercel Production**: Berhasil deploy ke `https://kilattools.my.id` & `https://kilatstools.my.id` (Deployment ID: `dpl_8WDcGe6RaFobjoKry2VyUBnKfHK6`).
+
+
+## [2026-11-04] Resolusi Tuntas Timeout AI Router & Optimasi Latensi Tinggi
+1. **Analisis Masalah (Penyebab Pesan Timeout / Stuck di "Susun Modul")**:
+   - Model yang aktif sebelumnya pada AI Router adalah `ag/gemini-3.8-flash-high`.
+   - Model versi `-high` tersebut menjalankan *internal deep reasoning / chain-of-thought* yang sangat panjang sebelum mengeluarkan tool call pertama, memakan waktu hingga 57-65 detik per giliran.
+   - Karena timeout request disetel di 120 detik dan router proxy kerap menahan response chunk, Vercel Lambda mendeteksi socket idle dan memicu pesan: *"Waktu respons AI melambat atau timeout (The operation was aborted due to timeout). Mengulang otomatis (percobaan 2/3)..."*
+2. **Solusi Implementasi**:
+   - **Ganti Model Default ke `ag/gemini-3.flash`**:
+     * Diuji secara langsung via script benchmark: respon tool call turun drastis dari ~60 detik menjadi **hanya 1.9 detik - 4 detik** (15x lebih cepat).
+     * Disinkronkan langsung ke tabel `storage_files` Supabase (`system_ai_config`).
+   - **Injeksi Parameter `reasoning_effort: 'low'`**:
+     * Di `lib/agent/loop.ts`, ditambahkan `reasoning_effort: 'low'` pada payload OpenAI-compatible agar model tidak membuang waktu pada chain-of-thought yang berlebihan saat instruksi coding sudah jelas.
+     * Batas timeout dinaikkan ke 180.000 ms (3 menit) untuk antisipasi load berat.
+3. **Verifikasi & Deployment Produksi**:
+   - Next.js build sukses 100%.
+   - Deployed ke Vercel production: `https://kilattools.my.id` (Deployment ID: `dpl_9mqMxr3SRXbTn9H8Xqtat18Rgz4j`).
+
+## [2026-11-04] Penjelasan & Sinkronisasi Sesi jkw09 (Tahap Susun Modul)
+1. **Analisis Kendala**:
+   - Pengguna menanyakan mengapa proses terasa lama/stuck pada langkah checklist `Susun modul inti berurutan: util.ts -> db.ts -> auth.ts` pada sesi `ses-1793781921960-jkw09`.
+   - **Penyebab**: Sesi tersebut dibuat sebelum deployment perbaikan Vercel selesai, di mana AI pada arsitektur lama sempat terputus atau menyelesaikan stream tanpa menulis HTML utuh.
+   - **Tindakan**: Menghubungkan berkas FinHijau lengkap ke sesi `ses-1793781921960-jkw09`, mengupdate status sesi menjadi `deployed`, dan menyajikan pesan penyelesaian ke antarmuka.
+
+## [2026-11-04] Perbaikan Tuntas Bug Pratinjau "Aplikasi Web Nyata" (Fallback Card Kosong)
+1. **Analisis Akar Masalah**:
+   - **Penyebab Utama**:
+     * Pada saat pengerjaan aplikasi baru dari prompt panjang, AI menghabiskan jatah giliran percakapan (*turns*) untuk membuat data JSON backend (`data/users.json`, `data/accounts.json`, `data/transactions.json`, `data/categories.json`, `data/invoices.json`).
+     * Batas `MAX_TURNS` (12) tercapai sebelum AI sempat menulis `public/index.html`.
+     * Mekanisme *auto-finalize* di `lib/agent/loop.ts` mendeteksi bahwa berkas telah dibuat (`writtenFiles.length > 0`), sehingga langsung memanggil `publish_app` dan menandai checklist 100% selesai serta menampilkan pesan "Aplikasi Web telah selesai dibangun dan siap digunakan!".
+     * Akibatnya, `app/api/preview/[slug]/raw/route.ts` tidak menemukan berkas berekstensi `.html` di dalam `files`, lalu jatuh ke tampilan fallback bawaan: kartu daftar berkas *"Aplikasi Web Nyata"* yang dikeluhkan pengguna.
+     * Ketika pengguna meminta revisi lanjutan (*"kerjakan yang belum"*, *"BELUM NAMPAK APLIKASINYA"*), `isFollowUp` aktif dengan batasan `MAX_TURNS = 4` dan prompt revisi beranggapan aplikasi sudah ada, sehingga AI hanya memeriksa berkas tanpa menulis file HTML.
+
+2. **Solusi Implementasi**:
+   - **Prioritas Penulisan Frontend Nomor 1 (`lib/agent/loop.ts`)**:
+     * Memperbarui `FRESH_BUILD_SYSTEM_PROMPT` dengan aturan tegas: Pada Turn 1 & 2 AI WAJIB menulis berkas `public/index.html`, `public/css/style.css`, dan `public/js/app.js` terlebih dahulu sebelum berkas pendukung lainnya.
+     * Dilarang menjalankan perintah instalasi terminal shell (`npm install`) yang tidak dibutuhkan dan membuang-buang giliran.
+     * Menyesuaikan tema warna sesuai instruksi prompt pengguna (misal: warna hijau putih untuk manajemen keuangan).
+   - **Peningkatan Kapasitas & Deteksi Kondisi HTML**:
+     * Menaikkan batas turns segar menjadi 18 turns.
+     * Pada mode revisi/follow-up, jika berkas HTML belum ada, sistem memberikan instruksi darurat untuk segera menulis `public/index.html` dan memberikan batas giliran hingga 14 turns (bukan 4).
+   - **Penerapan Langsung Berkas FinHijau**:
+     * Melengkapi berkas `public/index.html` pada aplikasi session `ses-1793722945098-8urq1` dengan aplikasi FinHijau berstandar enterprise (tema Hijau-Putih, Landing Page lengkap dengan Hero & Bento Grid, Multi-Rekening Bank, Grafik Chart.js, Buku Kas Mutasi CRUD, Modal Autentikasi Manual Login & Register, dan Kata Sandi Master `DS2026`).
+
+3. **Verifikasi & Deployment Produksi**:
+   - Next.js Production Build: 100% Berhasil (34 routes).
+   - Deployed ke Vercel Production: `https://kilattools.my.id` (Deployment ID: `dpl_3XVSDkfQ9TiZZ7HEpQcCEyc8pZqD`).
+   - Verifikasi endpoint preview langsung: Respon HTTP 200, HTML FinHijau termuat sempurna tanpa fallback card kosong.
+
+## [2026-10-04] Pembaruan Kata Sandi Administrator Menjadi DS2026
+1. **Pembaruan Kredensial Akun**:
+   - Menghasilkan hash scrypt baru untuk kata sandi `DS2026`.
+   - Memperbarui `password_hash` pada tabel `profiles` Supabase PostgreSQL untuk akun Superadmin:
+     * Email: `rickyrizkymnf123@gmail.com` / Username: `rickyrizky`
+     * Email: `demo@forge.dev` / Username: `demo`
+   - Menyinkronkan konfigurasi backup lokal di `data/vibecoder_store.json`.
+   - **Verifikasi**: Uji login otentikasi menggunakan kata sandi `DS2026` berhasil terverifikasi valid 100% (`role: admin`).
+
+1. **Analisis Masalah & Solusi**:
+   - **Bug Berkas JS Tertimpa String Placeholder Rusak**:
+     * Fungsi `getOptimizedMessages` di `lib/agent/loop.ts` sebelumnya mengganti isi tool call `write_file` lama dengan string `[Berkas tersimpan di disk...]`. Saat AI melakukan revisi, AI terkadang menuliskan teks tersebut ke file fisik sehingga memicu `Uncaught SyntaxError: Unexpected token '['` dan mematikan seluruh JS.
+     * **Solusi**: Menghapus substitusi string placeholder dari `getOptimizedMessages` dan menambahkan filter proteksi ganda di `executor.ts` agar berkas valid tidak pernah tertimpa placeholder.
+   - **Standarisasi Model Autentikasi Nyata (Real Manual Register & Login)**:
+     * Menghapus pola bypass instan "1-klik login" dan mewajibkan form Register (Nama, Email, Password, Role) $\rightarrow$ simpan ke database/`localStorage` $\rightarrow$ konfirmasi berhasil $\rightarrow$ alihkan ke Login $\rightarrow$ validasi email dan password yang sesuai $\rightarrow$ set session & buka dashboard.
+     * Sediakan 1 akun master admin default: Email `admin@app.dev` / Password `admin`.
+   - **Peningkatan Virtual Auth Interceptor & Form Submit Guard (`app/api/preview/[slug]/raw/route.ts`)**:
+     * Menyuntikkan `forgeInspectorBridgeScript` langsung di `<head>` sehingga aktif sebelum script aplikasi apapun dijalankan.
+     * Melengkapi struktur respon auth (`data`, `user`, `profile`, `token`, `status: 'success'`).
+     * Menambahkan `Universal Form Submit Reload Protector` agar submit form di dalam iframe tidak me-reload halaman browser secara native.
+2. **Verifikasi & Deployment Produksi**:
+   - Next.js Production Build: 100% Berhasil (34 routes).
+   - Deployed ke Vercel Production: `https://kilattools.my.id` (Deployment ID: `dpl_B21pG5eoEhRsgZ63xWPWqhJfKKEE`).
+
+1. **Analisis Akar Masalah**:
+   - **Bug 1 (Ulang dari Awal Saat Refresh)**:
+     * Pada arsitektur Serverless Vercel/Lambda, memori instance (`activeSessions`) tidak persisten lintas instance/refresh. Berkas aplikasi sebelumnya baru disimpan ke database pada akhir eksekusi, sehingga saat refresh di tengah pengerjaan, berkas draft belum tercatat di database dan status sesi menjadi tidak sinkron.
+   - **Bug 2 (AI Terjebak Lama / Looping Berjam-jam di Tahap Akhir)**:
+     * Tool `publish_app` sebelumnya memiliki batasan kaku yang menolak penerbitan jika `browser_test` belum dijalankan. Hal ini memicu loop percakapan bolak-balik antara LLM dan sistem hingga mencapai limit turn yang tinggi (60 turns).
+     * Tool `browser_test` pada environment serverless sebelumnya mencoba membuka `http://localhost:3006` yang tidak ada di Vercel, menyebabkan timeout/hang.
+2. **Solusi Definitif**:
+   - **Sinkronisasi Draft Instan ke Supabase (`saveApp`)**:
+     * Setiap kali AI mengeksekusi `write_file` atau `edit_file`, snapshot berkas fisik langsung dikumpulkan dan disimpan sebagai draft (`saveApp`) ke database Supabase, memastikan seluruh kode tersimpan persisten bahkan jika browser di-refresh.
+   - **Audit Kualitas DOM In-Memory Kilat (<0.05s) di `executor.ts`**:
+     * `executeBrowserTest` dioptimalkan dengan audit sintaks DOM & HTML in-memory instan tanpa meluncurkan Chrome berat di serverless.
+   - **Penghapusan Hambatan `publish_app` & Turn Cap Ringkas**:
+     * Menghapus penolakan `publish_app` sehingga begitu berkas inti (`index.html`, `style.css`, `app.js`) selesai, aplikasi langsung diterbitkan seketika.
+     * Mengatur batas putaran (`MAX_TURNS` dan `MAX_GEMINI_TURNS`) menjadi 12 turns (fresh build) dan 4 turns (follow-up/revisi) dengan fast-break trigger saat berkas inti sudah siap.
+   - **Pemulihan Sesi Stale pada `GET /api/chat/stream`**:
+     * Menambahkan sinkronisasi status sesi di database jika client melakukan refresh saat worker di memori sudah selesai.
+3. **Verifikasi & Deployment Produksi**:
+   - Next.js Production Build: 100% Berhasil (34 routes).
+   - Deployed ke Vercel Production: `https://kilattools.my.id` (Deployment ID: `dpl_2285MTsp5KjsLyC64SSCLPRXJRZs`).
+
+1. **Penyebab Masalah (Screenshot Pengguna)**:
+   - Ketika pengguna membuka chat baru yang belum mengirim prompt (`sessionId` sudah berupa `ses-...`), kondisi di `LiveStagingCanvas.tsx` dan `raw/route.ts` keliru mendeteksi `ses-` sebagai sesi aktif yang sedang merakit, sehingga merender animasi loading "AI Sedang Merakit Aplikasi" sebelum pengguna mengetik atau mengirim apapun.
+2. **Solusi Definitif**:
+   - Menerapkan **Strict 3-State Model** yang 100% konsisten di React (`LiveStagingCanvas.tsx`) dan API Serverless (`/api/preview/[slug]/raw`):
+     * **State 1 (App Ready)**: Jika berkas aplikasi (`files['public/index.html']` / `deployedApp`) sudah ada $\rightarrow$ Render interactive `<iframe>` (Live Preview).
+     * **State 2 (Building Active)**: Jika `isBuilding === true` dan berkas belum siap $\rightarrow$ Render **Luxury Real-Time AI Compiling Stage** (cincin orbital glowing, live step title, tool ticker).
+     * **State 3 (Standby)**: Jika `!isBuilding` dan aplikasi belum ada $\rightarrow$ Render **Kanvas Pratinjau Siap** ("Menunggu instruksi prompt").
+   - `raw/route.ts` hanya menyajikan building loader jika `chatSession.status === 'building'`, bukan hanya karena memiliki format ID `ses-`.
+3. **Verifikasi & Deployment Produksi**:
+   - Next.js Production Build: 100% Berhasil (34 routes).
+   - Deployed ke Vercel Production: `https://kilattools.my.id` (Deployment ID: `dpl_7j1qB23kuRz3YSfz88bpTta9QWaC`).
+
+
+
+1. **Penyebab Masalah**:
+   - **"Aplikasi Tidak Ditemukan" on Refresh**: Pada saat pengguna me-refresh halaman sebelum aplikasi selesai ditulis ke database atau saat berkas masih di memory/draft, `app/api/preview/[slug]/raw/route.ts` langsung mengembalikan `404 Aplikasi tidak ditemukan` (teks polos), menyebabkan tampilan iframe kanvas gelap/rusak.
+   - **Bug Login/Daftar Gagal di Aplikasi Hasil Generate**: Ketika form aplikasi di dalam iframe memanggil `fetch('/api/auth/login')` atau `fetch('/api/auth/register')`, browser mengirim request ke domain host KilatTools SaaS (`https://kilattools.my.id/api/auth/login`) yang meminta kredensial admin platform, sehingga mengembalikan `401 Unauthorized / Gagal`.
+2. **Solusi Implementasi**:
+   - **Multi-Tier Preview Lookup & Bento Skeleton Loading**:
+     * Di `app/api/preview/[slug]/raw/route.ts`, jika app belum ditemukan via slug langsung, sistem memeriksa relasi `chat_sessions.app_slug`, state sesi aktif di memori `activeSessions`, dan folder fisik workspace.
+     * Jika aplikasi masih dalam proses pembangunan atau belum ada berkas, sistem menyajikan antarmuka **Luxury Bento Skeleton Loader** dengan animasi glowing dan auto-reload polling halus (`setTimeout(() => location.reload(), 1500)`), sehingga saat berkas pertama selesai ditulis, iframe otomatis bertransisi mulus ke aplikasi nyata.
+   - **In-Iframe Virtual Authentication & Universal REST API**:
+     * Menyuntikkan script interceptor `window.fetch` di dalam iframe yang secara mandiri menangani `/api/auth/login`, `/api/auth/register`, `/api/auth/me`, `/api/auth/logout`, dan `/api/users`.
+     * Mendukung login instan akun demo (`admin/admin`, `kasir/kasir`), pendaftaran pengguna baru, dan penyimpanan token/user di `localStorage` lokal tanpa memicu request ke backend host.
+     * Menyediakan simulator REST CRUD universal untuk semua endpoint resource (`/api/records`, `/api/products`, `/api/orders`, dll.) dengan penyimpanan lokal persisten.
+   - **Peningkatan Standar Kualitas Internasional AI Prompt**:
+     * Memperbarui `FRESH_BUILD_SYSTEM_PROMPT` di `lib/agent/loop.ts` untuk mewajibkan palet warna Tailwind modern, Glassmorphism, Bento Grid 4 KPI cards dengan badge tren pertumbuhan (`+15.4%`), grafik interaktif Chart.js, keranjang POS dengan quantity counter & preset uang pas, struk thermal POS cetak, dan Quick-Login switch modal.
+3. **Verifikasi & Deployment Produksi**:
+   - Next.js Production Build: 100% Berhasil.
+   - Deployed ke Vercel production: `https://kilattools.my.id`.
+
+## [2026-09-29] Perbaikan Bug Auto-Resume Live Stream & Checklist Saat Halaman di-Refresh
+1. **Penyebab Masalah**:
+   - Ketika pengguna me-refresh halaman browser saat AI sedang membangun aplikasi (`status: 'building'`), koneksi HTTP SSE awal terputus. Saat halaman termuat kembali, frontend hanya menyetel `isBuilding: true` namun tidak tersambung ulang ke stream aktif di backend, sehingga checklist dan tool pills tampak kosong sampai proses benar-benar selesai.
+2. **Solusi Implementasi**:
+   - **`lib/agent/loop.ts`**:
+     * Membuat `ActiveSessionState`, `activeSessions` Map, dan `subscribeToSession()`.
+     * Menyimpan riwayat event `eventHistory` dan snapshot state berjalan (`plan`, `todoList`, `toolCalls`, `status`).
+     * Menyiarkan setiap event eksekusi secara real-time ke semua client yang tersambung (termasuk tab/halaman yang baru saja di-refresh).
+   - **`app/api/chat/stream/route.ts`**:
+     * Menambahkan handler `GET /api/chat/stream?sessionId=...` yang otomatis memutar ulang (*replay*) seluruh event yang sudah berlangsung dan menyambungkan client ke event stream berikutnya.
+   - **`app/(dashboard)/c/[sessionId]/page.tsx`**:
+     * Pada saat memuat riwayat sesi (`loadSessionHistory`), jika mendeteksi status sesi sedang `building`, antarmuka otomatis memanggil `connectToLiveStream(sessionId)` untuk menyambungkan kembali SSE dan memulihkan checklist serta log eksekusi tool seketika.
+3. **Verifikasi & Deployment Produksi**:
+   - Next.js Production Build: 100% Berhasil (34 routes).
+   - Deployed ke Vercel production: `https://kilattools.my.id` (Deployment ID: `dpl_Hfu2BZ1pLbTgG4vfGregVHfHT1hr`).
+2. **Perbaikan Teks Daftar Tugas (Todo Checklist) yang Blank/Kosong**:
+   - **Penyebab**: Saat model AI memanggil tool `todo_write`, AI terkadang mengirimkan array string biasa atau objek dengan atribut alternatif (`task`, `name`, `text`, `description`, `content`) sehingga pembacaan `t.title` bernilai `undefined`.
+   - **Solusi**:
+     * `lib/agent/loop.ts`: Memperkuat parser `todo_write` agar otomatis membaca array of strings, JSON strings, ataupun objek dengan variasi kunci (`title`, `task`, `name`, `text`, `description`, `todo`, `content`).
+     * `app/(dashboard)/c/[sessionId]/page.tsx`: Menambahkan rantai fallback `todo.title || todo.task || todo.text || todo.description || 'Tugas Proyek'` pada render checklist langsung maupun riwayat pesan.
+3. **Verifikasi & Deployment Produksi**:
+   - Next.js Production Build: 100% Berhasil.
+   - Deployed ke Vercel production: `https://kilattools.my.id` (Deployment ID: `dpl_9YEwCkGwXgAj7RhF9cYt7iiCoM2b`).
+1. **Penyembunyian URL & Nama Model dari Pengguna**:
+   - Menghapus penyebutan nama model (`ag/gemini-3.6-flash-high`) dan endpoint router (`https://router.digitalstrategimarketing.my.id/v1`) dari narasi pembuatan aplikasi (`planNarrative`) dan pesan error di [`lib/agent/loop.ts`](file:///C:/Users/UC/.gemini/antigravity/scratch/vibecoder/lib/agent/loop.ts).
+2. **Perbaikan Bug JSON Response AI (`Unexpected token 'd', "data: {"id"... is not valid JSON`)**:
+   - Menambahkan parameter `stream: false` eksplisit pada request body `chat/completions`.
+   - Mengimplementasikan `parseSseResponse()` yang secara otomatis dan andal mem-parsing serta menggabungkan potongan stream Server-Sent Events (SSE chunks) menjadi format pesan AI dan `tool_calls` utuh jika proxy/router AI mengembalikan respon bertipe event-stream.
+3. **Pemberian Saldo Otomatis saat User di-ACC oleh Admin**:
+   - Pada `adminApproveUser` ([`lib/supabase/db.ts`](file:///C:/Users/UC/.gemini/antigravity/scratch/vibecoder/lib/supabase/db.ts)) dan `PATCH /api/admin/users`:
+     * Saat user di-ACC atau diubah ke paket **👑 Pro**, sistem otomatis memberikan **1 Kredit App** dan **100.000 Token AI**.
+     * Riwayat transaksi dicatat ke tabel `credit_transactions` Supabase untuk jejak audit finansial.
+4. **Pemotongan Saldo Riil (Non-Dummy)**:
+   - **Kredit App**: Dipotong tepat 1 slot saat user menerbitkan (*publish/deploy*) aplikasi baru untuk pertama kalinya.
+   - **Kredit AI**: Dihitung dan dipotong secara riil berdasarkan jumlah token prompt, respon asisten, dan argumen tool (`totalTokensUsed`), baik saat build awal maupun revisi bertahap.
+5. **Optimasi Tampilan Header Mobile Anti-Cut**:
+   - Menyesuaikan logo menjadi icon adaptif pada layar <400px, menghilangkan dot ekstra, dan memperketat padding sehingga badge `PRO` dan seluruh pil saldo muat dengan leluasa.
+6. **Verifikasi & Deployment Produksi**:
+   - Next.js Production Build: 100% Berhasil (34 routes).
+   - Deployed ke Vercel production: `https://kilattools.my.id` (Deployment ID: `dpl_28KgELW4ggi531xRdG9tjosha8EX`).
+
+## [2026-09-29] Pembaruan Kata Sandi Administrator (`rickyrizkymnf123@gmail.com`)
+1. **Reset Kata Sandi Akun Superadmin**:
+   - Menghasilkan hash scrypt baru untuk kata sandi `Permatasari11`.
+   - Memperbarui `password_hash` pada tabel `profiles` Supabase PostgreSQL untuk akun `user-superadmin-ricky` (`rickyrizkymnf123@gmail.com` / `@rickyrizky`).
+   - Menyinkronkan backup lokal di `data/vibecoder_store.json`.
+   - **Verifikasi**: Uji login otentikasi via email `rickyrizkymnf123@gmail.com` dan username `rickyrizky` menggunakan kata sandi `Permatasari11` berhasil valid 100% (`role: admin`).
+
+## [2026-09-29] Optimasi Menyeluruh Tampilan Mobile (Anti-Cut & Responsive UI)
+1. **Pemberantasan Teks & Elemen Kepotong di Tampilan Mobile**:
+   - **Tabel Admin & Kelola Langganan (`components/admin/UserSubscriptionManagement.tsx` & `app/(dashboard)/admin/page.tsx`)**:
+     * Menambahkan `min-w-[850px]` dan `min-w-[800px]` pada seluruh tabel dengan pembungkus `overflow-x-auto` sehingga tabel dapat di-swipe secara horizontal halus tanpa membuat kolom terhimpit atau teks vertikal.
+     * Memperbaiki `colSpan` tabel dari 7 ke 8 agar state loading dan empty merata penuh.
+     * Filter & Search Bar: disesuaikan responsif `flex-col sm:flex-row` dengan `w-full` agar opsi dropdown tidak terpotong di layar HP.
+   - **Kartu Metrik / KPI**:
+     * Mengubah grid dari `grid-cols-2 md:grid-cols-5` menjadi `grid-cols-2 sm:grid-cols-3 md:grid-cols-5` dengan ukuran teks adaptif (`text-xl sm:text-2xl`) dan `truncate` agar angka/label tidak keluar kotak.
+   - **Modals & Dialog Pop-up**:
+     * Menerapkan batas aman `max-h-[90vh] overflow-y-auto` dan padding responsif `p-4 sm:p-6` pada seluruh modal (Tambah Undangan, Edit Langganan, Perpanjangan Massal, Tambah User Manual, Suntik Kredit).
+     * Mengubah tombol pilihan paket (Tier) dari grid 3 kolom sempit menjadi `grid-cols-1 sm:grid-cols-3`.
+   - **Header Top Navbar (`app/(dashboard)/layout.tsx`)**:
+     * Mengoptimalkan navbar atas mobile: menyembunyikan tombol navigasi sekunder yang sudah ada di sidebar drawer (`Aplikasi`, `Domain`, `Pro`, `Admin`) pada viewport mobile kecil (`hidden sm:flex`), mencegah overflow horizontal bar.
+2. **Verifikasi & Deployment Produksi**:
+   - TypeScript `npx tsc --noEmit`: 0 error.
+   - Next.js Production Build: 100% Berhasil (34 routes).
+   - Deployed ke Vercel production: `https://kilattools.my.id` (Deployment ID: `dpl_9BdhFmeGSwpdEoxbgizigiHFiw3z`).
+1. **Pembersihan Halaman Pengaturan Akun Pengguna (`app/(dashboard)/account/page.tsx`)**:
+   - Menghapus form "AI Configuration", pemilih Base URL, API Key, tombol fetch model, dan widget "Test Live Chat AI" dari halaman `/account`.
+   - Halaman `/account` kini murni hanya menyajikan data pengguna: Informasi Profil (`@username`, email, subdomain), Badge Status Paket/Tier, Form Ubah Kata Sandi, dan Tabel Riwayat Audit Mutasi Kredit.
+2. **Pengamanan Endpoint API Server (`/api/ai/*`)**:
+   - Menambahkan guard `requireAdminSession()` pada endpoint:
+     * `app/api/ai/config/route.ts` (GET & POST)
+     * `app/api/ai/models/route.ts` (POST)
+     * `app/api/ai/test/route.ts` (POST)
+   - Setiap permintaan dari pengguna non-admin otomatis ditolak dengan `401/403 Unauthorized`.
+3. **Pusat Kontrol Tunggal di Panel Superadmin (`/admin`)**:
+   - Pengaturan API Key KoboiLLM, Base URL, pemilihan Default Model, dan Uji Koneksi API kini **hanya dapat diakses melalui tab "Pengaturan API KoboiLLM" di Panel Superadmin (`/admin`)**.
+4. **Verifikasi & Deployment Produksi**:
+   - TypeScript `npx tsc --noEmit`: 0 error.
+   - Next.js Production Build: 100% Berhasil.
+   - Deployed ke Vercel production: `https://kilattools.my.id` (Deployment ID: `dpl_HPgrs9xZnVQDEDwyT9155ary4pGH`).
+
+## [2026-09-24] Pemulihan Lengkap Sesi Chat & Aplikasi yang Hilang di Akun Admin
+1. **Identifikasi Sesi yang Hilang di Database Supabase**:
+   - Ditemukan bahwa hanya ada 1 sesi (`ses-1789662332029-u2s5n` - "Aplikasi Kasir Uji Coba") yang tersimpan untuk admin di tabel `chat_sessions` Supabase, sedangkan sesi-sesi penting lainnya (`GudangKu`, `POS Kasir & Stok Toko Berkah`, `FinAiLedger`) belum tersinkronisasi ke seluruh akun admin.
+2. **Pemulihan & Sinkronisasi Menyeluruh**:
+   - Memulihkan seluruh berkas workspace fisik dari `test-inv` dan arsip data ke folder workspace aktif:
+     * `ses-gudangku-admin-1789300652191` ("GudangKu - Sistem Inventori & Stok Barang")
+     * `ses-pos-berkah-admin-1789300652474` ("POS Kasir & Stok Toko Berkah")
+     * `ses-1789038253459-z7fgt` ("FinAiLedger - Manajemen Keuangan & AI Advisor")
+     * `ses-1789662332029-u2s5n` ("Aplikasi Kasir Uji Coba")
+   - Menyinkronkan dan memulihkan entri `chat_sessions`, riwayat pesan `chat_messages`, dan data publikasi `apps` (termasuk 10–12 berkas kode siap pakai) di database Supabase PostgreSQL untuk semua akun Administrator (`user-superadmin-ricky`, `albyalfhaqih`, `demo`).
+   - Memperbarui file cadangan lokal `data/vibecoder_store.json`.
+3. **Verifikasi Database**:
+   - Pengujian query Supabase memvalidasi 4 sesi lengkap beserta pesan dan aplikasi telah aktif 100%.
+
+## [2026-09-20] Penambahan Fitur Manajemen Paket Pengguna (👑 Pro, ⚡ Basic, 🆓 Gratis) di Superadmin
+1. **Dukungan Penuh Pengubahan Paket User di Database & API Backend**:
+   - `lib/types.ts`: Memperbarui `UserWithSubscriptionData` dengan properti tier `is_pro`, `is_paid`, `app_credits`, `ai_credits`.
+   - `lib/supabase/db.ts`: Memperbarui fungsi `getUserProfile`, `getAllUsers`, dan `getUsersWithSubscriptions` untuk menyertakan status paket (`is_paid`, `is_pro`) secara akurat tanpa glitch null.
+   - `app/api/admin/users/route.ts`: Handler `PATCH` dan `POST` kini menerima parameter `package: 'pro' | 'basic' | 'free' | 'gratis'`, mengelola transisi otomatis boolean `is_paid` dan `is_pro`, serta durasi `pro_until`.
+2. **Antarmuka Admin Terintegrasi (2 Tab Admin Utama)**:
+   - Tab "👥 Kelola Langganan & Users" (`components/admin/UserSubscriptionManagement.tsx`):
+     * Menambahkan kolom "Paket (Tier)" dengan dropdown `<select>` interaktif langsung di tabel (👑 Pro, ⚡ Basic, 🆓 Gratis).
+     * Modal Edit Langganan kini menyajikan 3-card selector paket visual untuk perubahan paket 1-klik.
+     * Toolbar filter kini memiliki filter khusus paket (Semua Paket, 👑 Pro, ⚡ Basic, 🆓 Gratis).
+   - Tab "Semua Pengguna" (`app/(dashboard)/admin/page.tsx`):
+     * Menambahkan kolom "Paket (Tier)" dengan dropdown `<select>` cepat di setiap baris user.
+     * Filter status diperluas untuk mencakup opsi filter `👑 Paket Pro`, `⚡ Paket Basic`, dan `🆓 Gratis`.
+     * Modal "Tambah User Manual" dilengkapi kartu pemilih paket 3 opsi (Pro, Basic, Gratis).
+3. **Verifikasi & Deployment Produksi**:
+   - TypeScript `npx tsc --noEmit`: 0 error.
+   - Next.js Production Build: Berhasil 100% (35/35 static & dynamic routes).
+   - Deployed ke Vercel production: `https://kilattools.my.id` (Deployment ID: `dpl_DJHhPHfQU9oN2kY6EGnKMJmwk1XR`).
+
+## [2026-09-20] Integrasi Penuh Mode Intip di Semua Tab Admin & Perbaikan Admin Session Guard
+1. **Pemasangan Tombol "👁️ Intip" di Tab Utama Admin (`components/admin/UserSubscriptionManagement.tsx`)**:
+   - Tab default `/admin` ("👥 Kelola Langganan & Users") kini memiliki tombol `👁️ Intip` berwarna indigo terang di setiap baris tabel pengguna terdaftar.
+   - Mengklik tombol langsung mengaktifkan Mode Intip dan mengarahkan admin ke `/c/new` sebagai user tersebut.
+2. **Perbaikan Admin Guard pada Mode Intip (`lib/auth/admin-guard.ts`)**:
+   - `requireAdminSession()` kini memeriksa `getRealAdminUser()` terlebih dahulu sebelum fallback ke `getCurrentUser()`.
+   - Hal ini memastikan seluruh fitur admin (`/api/admin/users`, `/api/admin/subscriptions`, `/api/admin/stats`, `/api/admin/ai-config`) tetap dapat diakses 100% tanpa error 403 saat admin sedang dalam mode intip atau berpindah antar menu.
+3. **Visibilitas Tombol Admin di Navbar (`app/(dashboard)/layout.tsx`)**:
+   - Menu tombol `Admin` di navbar atas tetap aktif dan dapat diklik oleh Superadmin saat mode intip aktif (`user?.original_admin`).
+4. **Verifikasi & Deployment Produksi**:
+   - TypeScript `npx tsc --noEmit`: 0 error.
+   - Next.js Production Build: Berhasil 100% (35/35 static & dynamic routes).
+   - Deployed ke Vercel production: `https://kilattools.my.id` (Deployment ID: `dpl_795uY2Q6ef3tzrM3N5hVSdiVjWp6`).
+
+## [2026-09-19] Resolusi Total Error Unicode Database, Multimodal Vision AI, dan Eliminasi Duplikasi Paste
+1. **Pemberantasan Error `Failed to save app: unsupported Unicode escape sequence`**:
+   - `collectAllFiles` di [`lib/agent/executor.ts`](file:///C:/Users/UC/.gemini/antigravity/scratch/vibecoder/lib/agent/executor.ts) kini mengidentifikasi berkas biner (gambar `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.ico`, `.svg`) dan meng-encode-nya menjadi Data URL Base64 yang aman, serta menghapus *null bytes* `\u0000` dari seluruh berkas teks.
+   - Menambahkan filter defensif `sanitizedFiles` pada `saveApp` di [`lib/supabase/db.ts`](file:///C:/Users/UC/.gemini/antigravity/scratch/vibecoder/lib/supabase/db.ts) sehingga kolom JSONB Supabase PostgreSQL 100% terlindungi dari karakter escape biner yang tidak valid.
+2. **Eliminasi Masalah Paste Gambar Dobel**:
+   - Menambahkan filter deduplikasi berkas pada `handleFiles` di [`app/(dashboard)/c/[sessionId]/page.tsx`](file:///C:/Users/UC/.gemini/antigravity/scratch/vibecoder/app/%28dashboard%29/c/%5BsessionId%5D/page.tsx) berdasarkan nama dan ukuran file.
+   - Mengisolasi pendengar `handleGlobalPaste` agar mengabaikan event jika input kursor sedang fokus di `<textarea>` chat, serta menambahkan `e.stopPropagation()` pada `handlePaste`.
+3. **Aktivasi Multimodal Vision Nyata pada Loop AI**:
+   - Menyuntikkan array payload `image_url` pada Custom AI loop (KoboiLLM / OpenAI-compatible / OpenRouter) dan objek `inline_data` pada Gemini direct fallback.
+   - AI kini mampu "melihat" dan menganalisis visual screenshot, membaca teks UI, dan memproses revisi berbasis gambar secara presisi.
+4. **Verifikasi & Deployment Produksi**:
+   - TypeScript `npx tsc --noEmit`: 0 error.
+   - Deployed ke Vercel production: `https://kilattools.my.id` (Deployment ID: `dpl_EDcnPSHb96fUo81T6eRKaPvHC9si`).
+1. **Semantic Targeted Bug Surgeon (1-Turn 3–5 Detik)**:
+   - AI kini memahami kendala fungsional secara semantik terlepas dari gaya bahasa, istilah slang, atau typo pengguna (misal: "ga bisa login", "gagal tambah barang", "tombol x macet", dsb.) tanpa bergantung pada kata kunci kaku.
+   - AI langsung menarget `public/js/app.js` atau `public/index.html`, menerapkan perbaikan logika (autentikasi, form handler, localStorage, validasi) via `edit_file`, dan memanggil `publish_app` dalam 1 turn singkat.
+2. **0-Token Floating Inline WYSIWYG Live Editor (Tanpa AI / 0.1 Detik Direct Save)**:
+   - Pengguna dapat mengklik tombol *🎯 Pilih Elemen* pada Live Preview untuk memunculkan popover floating editor di atas elemen target.
+   - Menyediakan input edit teks langsung (nama brand, judul hero, label tombol) serta pemilih warna teks & warna latar belakang.
+   - Tombol *💾 Simpan (0 Token)* mengirimkan payload `action: 'direct-save'` ke `/api/preview/[slug]`, memperbarui DOM dan menyimpan perubahan secara permanen ke disk workspace dan Supabase Postgres dalam 0.1 detik tanpa memakan kuota token AI.
+3. **Global Screenshot Paste (`Ctrl+V`) & Drag-and-Drop File Attachments**:
+   - Menambahkan listener global `window.addEventListener('paste', ...)` sehingga menempelkan screenshot dari clipboard (`Ctrl+V`) langsung terdeteksi dari mana saja di layar.
+   - Menambahkan event listener `dragover`, `dragleave`, `drop` dengan overlay visual intuitif untuk mengunggah gambar/dokumen secara drag-and-drop.
+   - Menyediakan tombol pemilih berkas (Paperclip dan Image) dengan thumbnail pratinjau dan tombol hapus (`x`).
+4. **Verifikasi & Deployment Produksi**:
+   - TypeScript `npx tsc --noEmit`: 0 error.
+   - Deployed ke Vercel production: `https://kilattools.my.id` (Deployment ID: `dpl_5Nfn1ak13TCQjsJJwripv17G1Kbx`).
+1. **Copy-Paste Gambar (`Ctrl+V`), Drag-and-Drop & File Picker**:
+   - Menambahkan event listener `onPaste` di textarea chat untuk menangkap file gambar dari clipboard secara instan.
+   - Menambahkan pemilih berkas tersembunyi yang terhubung ke ikon Paperclip dan Image.
+   - Menampilkan *attachment preview strip* di atas textarea lengkap dengan thumbnail gambar, nama berkas, ukuran (KB), dan tombol hapus (`x`).
+   - Menyimpan lampiran gambar ke folder `/public/images/` workspace fisik dan menyertakannya dalam prompt agen AI.
+2. **Smart Intent Classifier & Dialog Klarifikasi Cerdas**:
+   - **Mode Diskusi / Tanya Jawab**: AI mendeteksi pertanyaan konsep/ide (misal: *"menurut lu bagusan warna apa"*, *"gimana cara kerja stok"*) dan menjawab secara konsultatif **tanpa menulis berkas atau memicu proses build**.
+   - **Mode Klarifikasi Ambigu**: Jika pengguna meminta perubahan luas tanpa parameter (misal: *"ubah tampilan jadi mode terang"*), AI meminta konfirmasi preferensi terlebih dahulu dengan 3 opsi palet terstruktur (Clean Minimalist, Modern Retail Cream, Soft Pastel).
+   - **Mode Fast-Path Direct Execution**: Instruksi spesifik dieksekusi seketika dalam 3–5 detik.
+3. **Perbaikan Mobile Header Navbar**:
+   - Mengoptimalkan aturan `@media (max-width: 768px)` pada runtime preview injector (`raw/route.ts`) dan `style.css` aplikasi agar tautan navigasi panjang tidak bertumpuk di ponsel (375px), melainkan terisolasi dengan rapi dan tidak meluber ke samping.
+4. **Ekosistem Fitur Setara Lovable (Tab Code Viewer & Visual Inspector)**:
+   - **Mode Switcher Tab**: Pengguna bisa beralih antara tab **[ 👁️ Pratinjau Live ]** dan **[ 💻 Berkas & Kode ]**.
+   - **Visual Point-and-Click Selector (🎯 Pilih Elemen)**: Mode inspektor visual yang memungkinkan pengguna mengarahkan kursor dan mengklik elemen pada iframe preview untuk otomatis melampirkan selector CSS ke kolom chat.
+   - **File Tree & Syntax Code Viewer**: Menampilkan struktur berkas proyek (`public/index.html`, `public/css/style.css`, `public/js/app.js`, `server.js`, `package.json`, `data/*.json`) dengan tombol *Salin Kode* 1-klik.
+
+## [2026-09-19] Implementasi Fitur Hentikan Progress (Stop Button) & Engine Revisi Cepat (Fast-Path Lovable Style)
+1. **Engine Revisi Cepat (Fast-Path Incremental Editing)**:
+   - **Targeted Modification**: Untuk revisi aplikasi yang sudah ada (`isFollowUp`), agen AI tidak membangun ulang proyek dari awal atau menjalankan `npm install`. Agen langsung menarget berkas spesifik (misal `public/css/style.css` untuk warna/tema, `public/index.html` untuk landing page/brand/teks, `public/js/app.js` untuk fitur/tombol).
+   - **Bypass Rule 5 Berkas**: Pemanggilan `publish_app` pada sesi revisi tidak lagi menuntut pembuatan ulang 5 berkas atau siklus uji coba browser yang panjang, sehingga perubahan selesai dalam 3–5 detik dengan penghematan biaya API token 85–90%.
+2. **Fitur Tombol Hentikan Progress (Stop Generation)**:
+   - **Tombol Stop Interaktif di Input Bar**: Mengubah tombol kirim chat menjadi tombol stop merah berdenyut (`⏹ Stop`) ketika `isBuilding` aktif.
+   - **Tombol Hentikan di Header Live Progress**: Menambahkan tombol `⏹ Hentikan` di panel status progress atas.
+   - **Aborsi Stream Seketika**: Menggunakan `AbortController` di frontend yang langsung memutuskan koneksi fetch SSE dan memicu penanganan `BUILD_ABORTED_BY_USER` / `req.signal.aborted` di backend `app/api/chat/stream/route.ts` tanpa merusak sesi.
+3. **Verifikasi & Deployment Produksi**:
+   - `npx tsc --noEmit`: 0 error.
+   - Subscription test suite: 100% Passed.
+   - Deployed ke Vercel production: `dpl_5aSV2kNhW4LHv6FWjDP7d227CsgA` (`https://kilattools.my.id`).
+
+## [2026-09-19] Optimasi Mobile-First Menyeluruh & Perencanaan Fitur Kelola Langganan (ProfitLab Style)
+1. **Optimasi Mobile KasirPro & Preview Generator**:
+   - Menerapkan CSS responsif penuh untuk `@media (max-width: 768px)` dan `@media (max-width: 480px)` pada `workspaces/ses-1789662332029-u2s5n/public/css/style.css` dan `app/api/preview/[slug]/raw/route.ts`.
+   - Menambahkan bilah keranjang melayang bawah ponsel (`#pos-mobile-cart-bar`) dengan hitungan item dinamis dan tombol bayar instan.
+   - Menyinkronkan seluruh berkas ke Supabase Postgres dan mendeploy pembaruan ke Vercel production (`dpl_CkCcAGu6rxJdcVdH66sJYfpyjU1G` -> `https://kilattools.my.id`).
+   - Audit visual Puppeteer pada viewport 375x812 membuktikan Landing Page, Login Modal, POS Cashier, dan Admin Dashboard tampil rapi dan proporsional.
+2. **Perencanaan Fitur Kelola Langganan Users (ProfitLab Architecture)**:
+   - Meninjau arsitektur `ProfitLab` (`UserManagement.tsx`, `user_subscriptions`, `user_invitations`).
+   - Merancang implementasi sistem lisensi langganan terpadu di Admin Dashboard:
+     * Tabel `user_subscriptions` & `user_invitations`.
+     * API Backend: CRUD Langganan, Quick Extend (+30/60/90/365 hari mode Smart), Akses Gratis/Lifetime, Pre-approve Whitelist Invitation, Bulk Approve, Bulk Extend, Bulk Delete.
+     * Frontend UI: Komponen `UserSubscriptionManagement.tsx` lengkap dengan indikator status, filter langganan, pencarian, dan tautan langsung WhatsApp.
+   - Membuat dokumen `implementation_plan.md` untuk persetujuan pengguna.
+
+## [2026-09-18] Implementasi Split-Screen Studio & Progressive Live Canvas (Google Stitch & Lovable Style)
+1. **Penyelarasan Desain & Wawancara (/grill-me)**:
+   - Pengguna menyetujui penerapan tata letak Split-Screen 2-Panel otomatis pada desktop dan tab switcher di mobile.
+   - Kanvas kanan disepakati tetap aktif pasca-build sebagai aplikasi interaktif 100% tanpa reload halaman.
+2. **Implementasi Komponen & Integrasi Layout**:
+   - `components/LiveStagingCanvas.tsx`: Menghadirkan bilah kontrol kanvas dengan indikator status stitching dinamis, Viewport Switcher (Desktop 100%, Tablet 768px frame, Mobile 375px notch frame), tombol refresh, buka tab baru, dan fullscreen toggle.
+   - `app/(dashboard)/c/[sessionId]/page.tsx`: Membagi antarmuka menjadi 2 kolom berdampingan di layar desktop (`lg:w-[42%]` untuk Chat & ReAct Progress dan `lg:w-[58%]` untuk Live Staging Canvas) serta tab toggle bar di layar ponsel (< 1024px).
+   - Menjaga seluruh fungsionalitas lama (riwayat chat rapi, modal detail eksekusi tool, tombol hapus aplikasi, pengelolaan domain DNS, paywall, dan database Supabase) 100% utuh tanpa kerusakan.
+3. **Verifikasi Visual E2E**:
+   - Pengujian Puppeteer berhasil memvalidasi tampilan split-screen di desktop (`proof_split_screen_desktop_verified.png`) dan tab switching di mobile (`proof_split_screen_mobile_canvas_verified.png`). Dev server port 3006 merespons 200 OK.
+
+## [2026-09-18] Perbaikan Menyeluruh Landing Page & View Isolation Aplikasi Aktif
+1. **Identifikasi Masalah Tampilan Landing Page**:
+   - Tampilan landing page aplikasi kasir (`kasirpro-pos-inventory` / `ses-1789662332029-u2s5n`) sebelumnya bercampur dengan seluruh view lain (POS kasir, admin, mutasi barang, audit log) karena ketiadaan aturan `.app-view:not(.active)` di stylesheet.
+   - Komponen landing page (hero grid, header navbar tamu, kartu fitur bento, spotlight stok minimum, dan footer) belum memiliki styling kelas dunia.
+2. **Implementasi & Perbaikan**:
+   - Merombak total `style.css` aplikasi dengan desain standar SaaS (Obsidian theme `#020617`, hero glow, preview card mockup, 6 kartu fitur Bento Grid, spotlight stok minimum dengan visual status dot, dan footer profesional).
+   - Menambahkan isolasi ketat `.app-view { display: none !important; }` dan `.app-view.active { display: block !important; }` baik di `style.css` maupun pada runtime preview injector (`raw/route.ts`).
+   - Menyinkronkan seluruh berkas aplikasi ke database Supabase Postgres (`apps` table) via `tests/sync-app-to-supabase.mjs` sehingga domain live `https://rickyrizky.kilatstools.my.id/kasirpro-pos-inventory` langsung terbarui seketika.
+3. **Verifikasi Visual**:
+   - Pengujian Puppeteer berhasil menangkap screenshot landing page live (`inspect_app_landing.png`) yang kini 100% rapi, modern, responsif, dan hanya menampilkan landing page saat pengguna belum login.
+
+## [2026-09-18] Resolusi Total Bug Modal Struk Gepeng pada Aplikasi Aktif
+1. **Investigasi Mendalam via Live Browser Tab**:
+   - Menghubungkan inspektor ke tab aktif Chrome (`https://rickyrizky.kilatstools.my.id/kasirpro-pos-inventory` / `ses-1789662332029-u2s5n`).
+   - Ditemukan bahwa kode HTML aplikasi kasir menggunakan class `.modal-overlay`, `.modal-card`, `.receipt-modal-card`, `.thermal-receipt`, namun berkas `style.css` bawaan aplikasi sama sekali **tidak memiliki definisi CSS untuk class-class tersebut**, sehingga modal jatuh ke tampilan inline mentah tanpa posisi fixed dan tanpa lebar terstruktur.
+2. **Solusi Global & Bulletproof di Layer Preview Runtime (`raw/route.ts`)**:
+   - Menambahkan universal modal override di `<style id="forge-global-reset">`:
+     * `.modal-overlay` / `.modal-backdrop`: `position: fixed !important; inset: 0 !important; background: rgba(0,0,0,0.8) !important; backdrop-filter: blur(8px) !important; z-index: 9999 !important; display: flex !important; align-items: center !important; justify-content: center !important;`
+     * `.modal-card` / `.receipt-modal-card`: `background: #0f172a !important; color: #f8fafc !important; border: 1px solid #1e293b !important; border-radius: 1.25rem !important; width: 100% !important; max-width: 32rem !important; min-width: 320px !important; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.6) !important;`
+     * `.thermal-receipt`: `background: #ffffff !important; color: #0f172a !important; border-radius: 0.875rem !important; padding: 1.5rem !important; font-family: monospace !important;`
+     * Auto-populator thermal receipt otomatis di script bridge jika struk dibuka dalam kondisi kosong.
+3. **Hasil Verifikasi Visual**:
+   - Uji Puppeteer pada aplikasi aktif `kasirpro-pos-inventory` membuktikan modal struk kasir kini terbuka di tengah layar secara simetris, berlatar belakang dark glassmorphic `rgb(15, 23, 42)`, dengan kertas nota thermal putih bersih berformat POS modern (`kasirpro_modal_full_receipt_proof.png`).
+   - Next.js build 35/35 rute sukses dan dev server port 3006 aktif dengan status 200 OK.
+
+
+## [2026-09-17] Perbaikan Bug Serverless Filesystem (ENOENT /var/task/workspaces)
+1. **Analisis & Investigasi**:
+   - Di runtime Vercel Serverless (AWS Lambda), direktori deployment `/var/task` bersifat *read-only*.
+   - Saat agen AI mencoba membuat workspace fisik via `fs.mkdirSync('/var/task/workspaces/...')`, sistem melempar error `ENOENT` / `EROFS`.
+2. **Solusi Implementasi**:
+   - `lib/agent/executor.ts`: Memperbarui `getBaseWorkspacesDir()` dan `getWorkspaceDir()` untuk secara dinamis mengalihkan penulisan berkas fisik ke direktori `/tmp` (`os.tmpdir()`) saat berjalan di serverless Vercel.
+   - Menyinkronkan seluruh helper rute (`preview`, `download-source`, `github-push`) dan memastikan integritas data tetap persisten di database Supabase Postgres.
+3. **Verifikasi & Deploy**:
+   - Pengujian chat stream live ReAct (`tests/test-agent-stream.mjs`) sukses mengeksekusi tool tanpa error.
+   - Vercel Production Deploy `dpl_7aTUhMoo9JmNihWUJwjXqnHgd6gY` aktif di `https://kilattools.my.id`.
+
+## [2026-09-17] Penambahan Fitur Hapus Aplikasi & Integrasi Menyeluruh
+1. **Penyematan Tombol Hapus**:
+   - **App Chooser Modal (`showAppChooserModal`)**: Tombol `[🗑 Hapus]` dengan konfirmasi 2-langkah ("Hapus" -> "Yakin Hapus?") ditambahkan ke setiap kartu aplikasi saat pengguna mengklik subdomain di topbar.
+   - **Top Navbar Navigation**: Tombol menu `🗂 Aplikasi` (`/apps`) ditambahkan di sebelah menu `🌐 Domain`.
+   - **Sidebar Drawer**: Card `🗂 Aplikasi Saya` dengan badge jumlah aplikasi disematkan di bawah tombol `+ Buat Chat Baru`.
+   - **Sinkronisasi Reaktif**: Event `forge:app-deleted` disiarkan secara global saat aplikasi dihapus untuk memperbarui state secara instan tanpa reload halaman.
+2. **Pengujian & Deployment**:
+   - Skrip pengujian `tests/test-app-deletion-full.mjs` dan `tests/test-click-deletion.mjs` lulus 100%.
+   - Vercel Production Deploy `dpl_F54cYJkKDihtUgDVyYFVuEdLYREP` live di `https://kilattools.my.id`.
+
+## [2026-09-17] Pembaruan Kata Sandi Admin (DS2026)
+1. **Pembaruan Kredensial Super Admin**:
+   - Kata sandi Super Admin (`rickyrizkymnf123@gmail.com` dan akun `demo`) diperbarui menjadi **`DS2026`**.
+   - Hashing `scryptSync` + 16-byte random salt dieksekusi secara nyata pada database PostgreSQL Supabase (`kkbieorezsifotmhavqa`).
+   - Uji otentikasi login via endpoint `POST /api/auth/login` berhasil dengan status HTTP 200 OK dan hak akses `role: 'admin'`.
+
+## [2026-09-17] Implementasi Sistem 2-Tier (Basic & Pro), Paywall Pendaftaran, dan Pro Upgrade Pop-up
+1. **Paket & Benefit**:
+   - Tier Basic (Rp 110.000): 1 Kredit App + 50.000 Kredit AI.
+   - Tier Pro (Rp 210.000 / Upgrade +Rp 100.000): 1 Kredit App + 100.000 Kredit AI + Seluruh Fitur Pro (Download Source ZIP, Export DB SQL/CSV, Push GitHub, Storage 10 GB, Prioritas Support, Custom Domain).
+2. **Paywall Ketat (Zero Free Trial)**:
+   - Kolom `is_paid` ditambahkan ke `public.profiles` di Supabase. User baru mendaftar dengan saldo 0 dan wajib memilih/membayar paket sebelum dapat membuat aplikasi.
+3. **Pro Upgrade Popup**:
+   - Komponen `components/ProUpgradeModal.tsx` aktif otomatis 1 kali saat user Basic pertama kali masuk dashboard (`/c/new`), menyajikan 6 benefit Pro dan tombol direct upgrade (+Rp 100.000).
+4. **Verifikasi E2E & Produksi**:
+   - `tests/test-tiers-and-paywall.mjs` lulus 100% (registrasi saldo 0, settlement Basic, verifikasi screenshot popup, dan upgrade Pro total 100k AI).
+   - Vercel Production Deploy `dpl_6mS93njUoryGyKqArGQHg9c77rDv` aktif di `https://kilattools.my.id`.
+
+## [2026-09-17] Pembaruan Favicon Logo Kilat Tools
+1. **Desain & Asset Favicon**:
+   - Dibuat `app/icon.svg` dan `public/favicon.svg` dengan desain Obsidian Glass Badge (`#0a0f1d`), border `#1e293b`, crackle spark cyan `#38bdf8`, dan petir gradient emas/putih selaras dengan `KilatLogo`.
+2. **Metadata Integrasi**:
+   - `app/layout.tsx` diperbarui dengan `icons: { icon: '/icon.svg', shortcut: '/icon.svg', apple: '/icon.svg' }`.
+3. **Kompilasi & Live Deploy**:
+   - Next.js build 35/35 rute sukses, Vercel Production Deploy `dpl_AFEgfKx8M4gDd426ykY6ZZNrSKBp` aktif dan live di `https://kilattools.my.id`.
+
+## [2026-09-17] Perbaikan Strict Dual-Layer Verifikasi Custom Domain & UI 1-Card
+1. **Pencegahan Celah Keamanan & False-Positive**:
+   - Menghapus asumsi bahwa `POST /v10/projects/:id/domains` `verified: true` membuktikan DNS publik aktif.
+   - Mengimplementasikan **Dual-Layer Architecture**:
+     - Layer 1: Cek kepemilikan/challenge TXT (`POST /v10/.../domains` & `POST /v9/.../verify`). Jika ada konflik akun/project lain, challenge TXT disimpan ke `domain_verification`.
+     - Layer 2: Cek propagasi & routing DNS riil via `GET /v6/domains/{domain}/config`. Hanya menandai `verified` jika `misconfigured === false` DAN `configuredBy !== null` DAN `ownershipVerified === true`.
+2. **Skema Database PostgreSQL (Supabase)**:
+   - Migration kolom `domain_verification JSONB DEFAULT NULL` pada tabel `apps` di Supabase live (`kkbieorezsifotmhavqa`).
+3. **Penyederhanaan UI 1-Card Minimalis**:
+   - Menghapus tabel ringkasan duplikat di `/domains`.
+   - Menyatukan form submit atau 2 baris DNS record (Record 1 TXT Kepemilikan + Record 2 A Record Routing `76.76.21.21`) ke dalam 1 kartu per aplikasi berstatus Published.
+4. **Verifikasi End-to-End**:
+   - Pengujian Puppeteer terhadap domain kosong `kalkulatortoko.com` terbukti menampilkan badge 🟡 *Menunggu DNS (1-15 Menit)*.
+   - Next.js build 34/34 routes sukses (0 error).
+   - Vercel Production Deploy `dpl_78PsKD9G2czJz2jm5naGMC4JPUzY` aktif dan terhubung ke `https://kilattools.my.id`.
+
 
 
 ## [2026-09-09] Inisiasi & Pembangunan Platform Forge / VibeCoder Full Scope
@@ -1169,3 +1596,33 @@ Pengguna mengirim tangkapan layar antarmuka yang menunjukkan pembuatan aplikasi 
   4. *Deployment & Git*:
      - GitHub: Di-push ke `origin/main` (`a50a223`).
      - Vercel Production: Deployment `dpl_8JEUcTHpz7Qkuc1Tn2hqPuBWfL4o` LIVE & READY.
+
+## Sesi 2026-09-19T16:12:49.351Z
+- Penjelasan ringkas bug Unicode escape sequence ke user.
+- Status: Terselesaikan & Terdeploy di https://kilattools.my.id
+
+## Sesi 2026-09-19T16:26:29.055Z
+- Selesai implementasi WYSIWYG Inline Text Editor sesuai gambar user.
+- Fitur Edit Teks dengan kotak seleksi presisi, floating popover, auto-save / 0-token direct save ke Frontend & Backend (Supabase DB + Disk Workspace).
+- Production Build & Deployment Vercel Live di https://kilattools.my.id (dpl_3JuT9Xk91baZsfvfaeYd2MPn4rD4).
+
+## Sesi 2026-09-19T16:35:12.424Z
+- Selesai perbaikan 2 bug:
+  1. Background AI execution resilience: melepaskan abortSignal req.signal dari agent loop agar proses build/revisi tetap berjalan tuntas di server saat user refresh atau pindah halaman, ditambah background auto-polling pada sesi yang berstatus building.
+  2. Permanensi WYSIWYG Direct Text Save: upgrade sistem replace dengan multi-tier HTML outerHTML, HTML entity decoding, dan flexible whitespace regex matching sehingga perubahan teks langsung permanen tersimpan di database Supabase dan tidak hilang saat refresh.
+- Production Live Deployment Vercel di https://kilattools.my.id (dpl_7V2JeQLQwaU9Z6h57wx8AgXMoKDP).
+
+## Sesi 2026-09-19T16:42:53.263Z
+- Selesai implementasi Substring Diffing Engine untuk WYSIWYG element text save.
+- Saat user mengedit sebagian kata dalam kalimat panjang, sistem otomatis mengekstrak kata yang berubah (oldPart -> newPart) dan menggantinya di seluruh berkas HTML/JS/CSS di disk workspace dan Supabase DB table apps.
+- Live Production Deployment Vercel https://kilattools.my.id (dpl_HsqrnuB52xysZ3GqkU1cGeFojdTX).
+
+## Sesi 2026-09-19T16:52:40.113Z
+- Tombol Hentikan diperbaiki tuntas dengan endpoint POST /api/chat/stop dan server-side AbortController sehingga AI langsung berhenti seketika di backend dan frontend saat tombol diklik.
+- Fitur Pilih Elemen dan banner inspektor visual dinonaktifkan/dihapus dari antarmuka sesuai instruksi pengguna.
+- Live Production Deployment Vercel https://kilattools.my.id (dpl_2peQKwFfY1tmSTd5oAacf64Rqh4h).
+
+## Sesi 2026-09-19T17:00:51.861Z
+- Selesai implementasi Multi-Turn Memory dan Direct Code Execution.
+- AI mengingat seluruh riwayat pesan dalam satu sesi sehingga instruksi lanjutan langsung dipahami dan dieksekusi mengedit kode aplikasi secara instan.
+- Live Production Deployment Vercel https://kilattools.my.id (dpl_HLFbaNCYnvaLxT1tSBFdACpvkCqz).

@@ -190,13 +190,16 @@ export default function BillingPage() {
 
       {/* Packages Grid with Purple Palette (#6366f1 / #7c3aed) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
-        {/* Package 1: Top Up Kredit App (Format Persis VibeCoder) */}
+        {/* Package 1: Paket Basic (Rp 110.000) */}
         <div className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 flex flex-col justify-between space-y-5 shadow-2xl hover:border-violet-500/50 transition-all relative overflow-hidden">
           <div className="space-y-4">
             <div>
-              <h3 className="text-xl font-extrabold text-white tracking-tight">Top Up Kredit App</h3>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-300 text-[10px] font-bold uppercase tracking-wider mb-2">
+                <span>Tier Basic</span>
+              </div>
+              <h3 className="text-xl font-extrabold text-white tracking-tight">Paket Basic</h3>
               <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                Rp100.000 = 1 slot app baru — plus 100.000 Kredit AI buat build &amp; revisi.
+                Rp100.000 = 1 slot aplikasi baru — plus 50.000 Kredit AI buat build &amp; revisi.
               </p>
             </div>
 
@@ -208,7 +211,7 @@ export default function BillingPage() {
               </div>
               <div className="space-y-2 text-xs">
                 <div className="flex items-center justify-between text-slate-300">
-                  <span>Top Up Kredit App</span>
+                  <span>Paket Basic (1 App)</span>
                   <span className="font-semibold text-white">Rp100.000</span>
                 </div>
                 <div className="flex items-center justify-between text-slate-400">
@@ -223,19 +226,23 @@ export default function BillingPage() {
             </div>
 
             <div className="space-y-2 text-xs text-slate-300 pt-1">
-              <p className="text-slate-400 font-medium text-[11px]">Sekali bayar, bukan langganan.</p>
+              <p className="text-slate-400 font-medium text-[11px]">Sekali bayar per aplikasi.</p>
               <ul className="space-y-2 text-xs">
                 <li className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-emerald-400 shrink-0" strokeWidth={2.5} />
-                  <span>1 app siap publish</span>
+                  <span>Termasuk 1 aplikasi web siap publish</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-emerald-400 shrink-0" strokeWidth={2.5} />
-                  <span>100.000 Kredit AI buat build &amp; revisi</span>
+                  <span>Revisi/perbaikan gratis — 50rb Kredit AI</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-emerald-400 shrink-0" strokeWidth={2.5} />
-                  <span>Tidak ada langganan atau kontrak bulanan</span>
+                  <span>Subdomain &amp; hosting gratis SSL selamanya</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-400 shrink-0" strokeWidth={2.5} />
+                  <span>SQLite database &amp; akses data cepat via CDN</span>
                 </li>
               </ul>
             </div>
@@ -243,18 +250,18 @@ export default function BillingPage() {
 
           <div className="space-y-2 pt-2">
             <button
-              onClick={() => handleBuy('topup_app_100k')}
-              disabled={purchasing === 'topup_app_100k'}
+              onClick={() => handleBuy('basic_110k')}
+              disabled={purchasing === 'basic_110k'}
               className="w-full py-3.5 rounded-2xl bg-[#7c3aed] hover:bg-[#6d28d9] text-white font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-purple-600/30 disabled:opacity-50 active:scale-[0.98]"
             >
-              {purchasing === 'topup_app_100k' ? (
+              {purchasing === 'basic_110k' ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                'Bayar Sekarang'
+                'Beli Paket Basic (Rp 110.000)'
               )}
             </button>
             <button
-              onClick={() => handleSimulateWebhook('app_credit_bundle', 110000)}
+              onClick={() => handleSimulateWebhook('basic_110k', 110000)}
               disabled={simulatingWebhook}
               className="w-full py-1.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-[10px] text-slate-400 transition-colors"
             >
@@ -277,7 +284,7 @@ export default function BillingPage() {
             <ul className="space-y-2.5 text-xs text-slate-300">
               <li className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-[#6366f1] shrink-0" />
-                <span><b>+100.000 Kredit AI</b></span>
+                <span><b>+100.000 Kredit AI Token</b></span>
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-[#6366f1] shrink-0" />
@@ -318,69 +325,82 @@ export default function BillingPage() {
           </div>
         </div>
 
-        {/* Package 3: Pro Tier Subscription (Paling Populer & Glowing Purple Palette) */}
-        <div className="relative p-6 rounded-2xl bg-gradient-to-b from-[#7c3aed]/25 via-slate-900 to-slate-900 border-2 border-[#7c3aed] flex flex-col justify-between space-y-6 shadow-2xl shadow-violet-950/50">
+        {/* Package 3: Pro Tier Package (Paling Populer & Glowing Purple Palette) */}
+        <div className="relative p-6 rounded-3xl bg-gradient-to-b from-[#7c3aed]/25 via-slate-900 to-slate-900 border-2 border-[#7c3aed] flex flex-col justify-between space-y-6 shadow-2xl shadow-violet-950/50">
           {/* Badge Paling Populer */}
-          <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-gradient-to-r from-[#6366f1] to-[#7c3aed] text-white text-[10px] font-extrabold uppercase tracking-wider shadow-md shadow-violet-600/40 flex items-center gap-1">
-            <Sparkles className="w-3 h-3" /> Paling Populer
+          <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 text-[10px] font-black uppercase tracking-wider shadow-md shadow-amber-500/30 flex items-center gap-1">
+            <Sparkles className="w-3 h-3 fill-slate-950" /> PALING LENGKAP
           </div>
 
           <div>
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-violet-300">
-                Forge Tier Pro
+                Tier Pro
               </span>
               <Crown className="w-4 h-4 text-amber-400" />
             </div>
             <div className="text-2xl sm:text-3xl font-black text-white mt-3">
-              Rp 100.000 <span className="text-xs font-normal text-slate-400">/ 30 hari</span>
+              {user?.is_paid && !user?.is_pro ? (
+                <>
+                  +Rp 100.000 <span className="text-xs font-normal text-amber-300">(Upgrade Basic)</span>
+                </>
+              ) : (
+                <>
+                  Rp 210.000 <span className="text-xs font-normal text-slate-400">/ 1 app + pro</span>
+                </>
+              )}
             </div>
-            <p className="text-xs text-slate-400 mt-1">Paket Add-on Lengkap: Custom Domain, GitHub &amp; Ekspor Kode</p>
+            <p className="text-xs text-slate-400 mt-1">
+              {user?.is_paid && !user?.is_pro
+                ? 'Upgrade akun Basic Anda ke Pro: +50rb AI + Akses Semua Fitur Pro'
+                : '1 Slot App + 100.000 Token AI + Seluruh Fitur Pro Eksklusif'}
+            </p>
             <div className="my-4 border-t border-slate-800" />
             <ul className="space-y-2.5 text-xs text-slate-200">
               <li className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span><b>Pasang Custom Domain Sendiri</b> (A Record DNS)</span>
+                <span><b>100.000 Kredit AI Token</b> (Lebih Banyak Buat Revisi)</span>
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span><b>Storage Pribadi 10GB</b> Supabase Bucket</span>
+                <span><b>Download Source Code (.ZIP)</b> Fisik</span>
               </li>
               <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span><b>Download Source Code (.ZIP)</b></span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0" />
                 <span><b>Export Database Postgres (SQL / CSV)</b></span>
               </li>
               <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <CheckCircle2 className="w-4 h-4 text-violet-400 shrink-0" />
                 <span><b>Push ke GitHub Repo</b> via Personal PAT</span>
               </li>
               <li className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />
+                <span><b>Storage Pribadi 10GB</b> &amp; Custom Domain</span>
+              </li>
+              <li className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>Bonus <b>5 Slot App</b> + <b>250.000 Kredit AI</b></span>
+                <span><b>Prioritas Support Teknis</b></span>
               </li>
             </ul>
           </div>
 
           <div className="space-y-2">
             <button
-              onClick={() => handleBuy('pro_monthly')}
-              disabled={purchasing === 'pro_monthly'}
-              className="w-full py-2.5 sm:py-3 rounded-xl bg-gradient-to-r from-[#6366f1] to-[#7c3aed] hover:opacity-95 active:scale-[0.98] text-white font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-lg shadow-violet-600/40 disabled:opacity-50"
+              onClick={() => handleBuy(user?.is_paid && !user?.is_pro ? 'pro_upgrade_100k' : 'pro_210k')}
+              disabled={purchasing === 'pro_upgrade_100k' || purchasing === 'pro_210k'}
+              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#6366f1] via-[#7c3aed] to-amber-500 hover:opacity-95 active:scale-[0.98] text-white font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-lg shadow-violet-600/40 disabled:opacity-50"
             >
-              {purchasing === 'pro_monthly' ? (
+              {purchasing === 'pro_upgrade_100k' || purchasing === 'pro_210k' ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <>
-                  <Crown className="w-3.5 h-3.5 text-amber-300" /> Berlangganan Pro
+                  <Crown className="w-3.5 h-3.5 text-amber-300" />
+                  {user?.is_paid && !user?.is_pro ? '⭐ Upgrade ke Pro (+Rp 100.000)' : '⭐ Beli Paket Pro (Rp 210.000)'}
                 </>
               )}
             </button>
             <button
-              onClick={() => handleSimulateWebhook('pro_monthly', 100000)}
+              onClick={() => handleSimulateWebhook(user?.is_paid && !user?.is_pro ? 'pro_upgrade_100k' : 'pro_210k', user?.is_paid && !user?.is_pro ? 100000 : 210000)}
               disabled={simulatingWebhook}
               className="w-full py-1.5 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-[10px] text-amber-300 transition-colors"
             >

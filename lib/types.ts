@@ -1,17 +1,79 @@
+export type AppRole = 'admin' | 'moderator' | 'user';
+
+export interface UserSubscription {
+  id: string;
+  user_id: string;
+  subscription_end: string;
+  is_free_access: boolean;
+  is_active: boolean;
+  notes: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface UserInvitation {
+  id: string;
+  email: string;
+  role: AppRole;
+  notes?: string | null;
+  created_at: string;
+  accepted_at: string | null;
+}
+
+export interface UserWithSubscriptionData {
+  id: string;
+  email: string;
+  username?: string;
+  name?: string | null;
+  phone_number?: string | null;
+  is_registered: boolean;
+  is_approved: boolean;
+  is_pro?: boolean;
+  is_paid?: boolean;
+  app_credits?: number;
+  ai_credits?: number;
+  role: AppRole;
+  created_at: string | null;
+  subscription: {
+    id: string;
+    subscription_end: string;
+    is_free_access: boolean;
+    is_active: boolean;
+    notes: string | null;
+  } | null;
+  invitation: {
+    id: string;
+    role: AppRole;
+    accepted_at: string | null;
+    created_at: string;
+  } | null;
+}
+
 export interface UserProfile {
   id: string;
   email: string;
   username: string;
   subdomain: string;
+  phone_number?: string | null;
+  name?: string | null;
+  notes?: string | null;
   app_credits: number;
   ai_credits: number;
   is_pro: boolean;
   pro_until: string | null;
-  role?: 'admin' | 'user';
+  role?: AppRole;
   status?: 'active' | 'pending' | 'rejected' | 'suspended';
   is_approved?: boolean;
+  is_paid?: boolean;
+  subscription?: UserSubscription | null;
   created_at: string;
   updated_at: string;
+  is_impersonating?: boolean;
+  original_admin?: {
+    id: string;
+    email: string;
+    username?: string;
+  } | null;
 }
 
 export interface ChatSession {
@@ -98,7 +160,7 @@ export interface PaymentRecord {
   order_id: string;
   user_id: string;
   amount: number;
-  item_type: 'app_credit_bundle' | 'ai_credit_topup' | 'pro_subscription';
+  item_type: 'basic_110k' | 'pro_210k' | 'pro_upgrade_100k' | 'app_credit_bundle' | 'ai_credit_topup' | 'pro_subscription' | 'pro_addon';
   status: 'pending' | 'settlement' | 'expire' | 'cancel' | 'failed';
   snap_token?: string | null;
   snap_redirect_url?: string | null;

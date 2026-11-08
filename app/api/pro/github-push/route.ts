@@ -3,8 +3,9 @@ import { getCurrentUser } from '@/lib/auth/session';
 import { getAppById, getUserProfile } from '@/lib/supabase/db';
 import { pushToGitHub } from '@/lib/builder/github';
 
+import fs from 'node:fs';
 import path from 'node:path';
-import { collectAllFiles } from '@/lib/agent/executor';
+import { collectAllFiles, getWorkspaceDir } from '@/lib/agent/executor';
 
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
@@ -42,8 +43,8 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const wsDir = app.session_id ? path.join(process.cwd(), 'workspaces', app.session_id) : '';
-  const diskFiles = wsDir ? collectAllFiles(wsDir) : {};
+  const wsDir = app.session_id ? getWorkspaceDir(app.session_id) : '';
+  const diskFiles = wsDir && fs.existsSync(wsDir) ? collectAllFiles(wsDir) : {};
   const filesToPush = { ...(app.files || {}), ...diskFiles };
 
   const pushResult = await pushToGitHub({

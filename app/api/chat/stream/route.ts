@@ -7,12 +7,109 @@ import {
   createChatMessage,
   saveApp,
   updateChatSession,
-  getChatSessionById
+  getChatSessionById,
+  getChatMessages,
+  getAppBySlug
 } from '@/lib/supabase/db';
-import { runAgenticLoop } from '@/lib/agent/loop';
+import { runAgenticLoop, getActiveSessionState, subscribeToSession } from '@/lib/agent/loop';
 import { estimateTokens, calculateAiCreditCost } from '@/lib/ai/token-counter';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 300;
+
+export async function GET(req: NextRequest) {
+  const session = await getCurrentUser();
+  if (!session) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  const { searchParams } = new URL(req.url);
+  const sessionId = searchParams.get('sessionId');
+  if (!sessionId) {
+    return new Response(JSON.stringify({ error: 'sessionId is required' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  const activeState = getActiveSessionState(sessionId);
+  if (!activeState || activeState.status !== 'building') {
+    // If DB session was marked 'building' but no live worker in RAM exists (e.g. cold start/refresh after completion), sync DB status
+    try {
+      const chatSession = await getChatSessionById(sessionId);
+      if (chatSession && chatSession.status === 'building') {
+        const app = await getAppBySlug(sessionId);
+        if (app) {
+          await updateChatSession(sessionId, {
+            status: app.status === 'published' ? 'deployed' : 'draft_ready',
+            app_slug: app.slug
+          });
+        } else {
+          await updateChatSession(sessionId, { status: 'active' });
+        }
+      }
+    } catch {}
+
+    return new Response(JSON.stringify({ active: false }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  const encoder = new TextEncoder();
+  const stream = new TransformStream();
+  const writer = stream.writable.getWriter();
+  let isClosed = false;
+
+  const safeClose = async () => {
+    if (!isClosed) {
+      isClosed = true;
+      try {
+        await writer.close();
+      } catch {}
+    }
+  };
+
+  const sendEvent = async (event: string, data: any) => {
+    if (isClosed) return;
+    try {
+      const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+      await writer.write(encoder.encode(payload));
+    } catch {
+      isClosed = true;
+    }
+  };
+
+  // 1. Replay historical events to immediately catch up state on client!
+  for (const hist of activeState.eventHistory) {
+    await sendEvent(hist.type, hist.data);
+  }
+
+  // 2. Subscribe to subsequent live events
+  const { unsubscribe } = subscribeToSession(sessionId, async (event, data) => {
+    await sendEvent(event, data);
+    if (event === 'complete' || event === 'done' || event === 'error') {
+      await safeClose();
+    }
+  });
+
+  req.signal.addEventListener('abort', () => {
+    unsubscribe();
+    safeClose();
+  });
+
+  return new Response(stream.readable, {
+    headers: {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no'
+    }
+  });
+}
 
 export async function POST(req: NextRequest) {
   const session = await getCurrentUser();
@@ -23,9 +120,9 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const { sessionId, prompt } = await req.json();
-  if (!sessionId || !prompt) {
-    return new Response(JSON.stringify({ error: 'sessionId dan prompt wajib diisi' }), {
+  const { sessionId, prompt, attachments } = await req.json();
+  if (!sessionId || (!prompt && (!attachments || attachments.length === 0))) {
+    return new Response(JSON.stringify({ error: 'sessionId dan prompt/attachments wajib diisi' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' }
     });
@@ -49,11 +146,21 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Load prior messages before saving current one for historical context memory
+  const previousMessages = await getChatMessages(sessionId);
+
+  // Format saved user message
+  let savedUserPrompt = prompt || '';
+  if (attachments && attachments.length > 0) {
+    const attNames = attachments.map((a: any) => `📎 [${a.name}]`).join(' ');
+    savedUserPrompt = savedUserPrompt ? `${savedUserPrompt}\n\n${attNames}` : attNames;
+  }
+
   // Save user's message
   await createChatMessage({
     session_id: sessionId,
     role: 'user',
-    content: prompt,
+    content: savedUserPrompt,
     tool_calls: [],
     todo_list: []
   });
@@ -92,26 +199,32 @@ export async function POST(req: NextRequest) {
       const hasAppCredit = wasAlreadyDeployed ? true : (user.app_credits || 0) > 0;
 
       const genResult = await runAgenticLoop({
-        userPrompt: prompt,
+        userPrompt: prompt || '',
         userId: user.id,
         userSubdomain: user.subdomain,
         sessionId,
         hasAppCredit,
+        attachments,
+        historyMessages: previousMessages,
         onEvent: async (ev) => {
           await sendEvent(ev.type, ev);
         }
       });
 
-      if (genResult.needsClarification) {
+      if (genResult.needsClarification || genResult.isDiscussion) {
+        const responseContent = genResult.clarificationMessage || genResult.summaryMessage || '';
         await createChatMessage({
           session_id: sessionId,
           role: 'assistant',
-          content: genResult.clarificationMessage || '',
+          content: responseContent,
           tool_calls: [],
           todo_list: []
         });
         await updateChatSession(sessionId, { status: 'active' });
-        await sendEvent('done', { status: 'clarification' });
+        await sendEvent('done', {
+          status: genResult.needsClarification ? 'clarification' : 'discussion',
+          content: responseContent
+        });
         await safeClose();
         return;
       }
@@ -168,8 +281,13 @@ export async function POST(req: NextRequest) {
       });
     } catch (err: any) {
       console.error('Generation pipeline error:', err);
-      await sendEvent('error', { message: err.message || 'Terjadi kesalahan internal' });
-      await updateChatSession(sessionId, { status: 'failed' });
+      const isAborted = req.signal.aborted || err.message === 'BUILD_ABORTED_BY_USER' || err.name === 'AbortError';
+      if (isAborted) {
+        await sendEvent('error', { message: 'Proses dibatalkan oleh pengguna.' });
+      } else {
+        await sendEvent('error', { message: err.message || 'Terjadi kesalahan internal' });
+      }
+      await updateChatSession(sessionId, { status: isAborted ? 'active' : 'failed' });
     } finally {
       await safeClose();
     }

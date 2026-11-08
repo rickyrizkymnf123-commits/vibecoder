@@ -5,7 +5,11 @@ import {
   GeneratedApp,
   CreditTransaction,
   PaymentRecord,
-  StorageFileItem
+  StorageFileItem,
+  UserSubscription,
+  UserInvitation,
+  UserWithSubscriptionData,
+  AppRole
 } from '../types';
 import { supabaseAdmin } from './admin';
 
@@ -28,11 +32,14 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
       profile.email === 'rickyrizkymnf123@gmail.com' ||
       profile.username === 'ricky' ||
       profile.username === 'rickyrizky';
+    const isPaid = isAdmin || (profile.is_paid !== undefined && profile.is_paid !== null ? Boolean(profile.is_paid) : (Boolean(profile.is_pro) || Boolean(profile.app_credits && profile.app_credits > 0)));
     return {
       ...profile,
       role: isAdmin ? 'admin' : (profile.role || 'user'),
       status: profile.status || 'active',
-      is_approved: profile.is_approved !== undefined ? profile.is_approved : true
+      is_approved: profile.is_approved !== undefined ? profile.is_approved : true,
+      is_paid: isPaid,
+      is_pro: isAdmin ? true : Boolean(profile.is_pro)
     } as UserProfile;
   } catch (err) {
     console.error('Failed to getUserProfile:', err);
@@ -60,11 +67,14 @@ export async function getUserByEmailOrUsername(
       profile.email === 'rickyrizkymnf123@gmail.com' ||
       profile.username === 'ricky' ||
       profile.username === 'rickyrizky';
+    const isPaid = isAdmin || (profile.is_paid !== undefined ? profile.is_paid : (profile.is_pro || (profile.app_credits && profile.app_credits > 0)));
     const cleanProfile: UserProfile = {
       ...profile,
       role: isAdmin ? 'admin' : (profile.role || 'user'),
       status: profile.status || 'active',
-      is_approved: profile.is_approved !== undefined ? profile.is_approved : true
+      is_approved: profile.is_approved !== undefined ? profile.is_approved : true,
+      is_paid: isPaid,
+      is_pro: isAdmin ? true : Boolean(profile.is_pro)
     };
     return { profile: cleanProfile, passwordHash: password_hash || undefined };
   } catch (err) {
@@ -148,11 +158,14 @@ export async function getAllUsers(): Promise<UserProfile[]> {
       profile.email === 'rickyrizkymnf123@gmail.com' ||
       profile.username === 'ricky' ||
       profile.username === 'rickyrizky';
+      const isPaid = isAdmin || (profile.is_paid !== undefined && profile.is_paid !== null ? Boolean(profile.is_paid) : (Boolean(profile.is_pro) || Boolean(profile.app_credits && profile.app_credits > 0)));
       return {
         ...profile,
         role: isAdmin ? 'admin' : (profile.role || 'user'),
         status: profile.status || 'active',
-        is_approved: profile.is_approved !== undefined ? profile.is_approved : true
+        is_approved: profile.is_approved !== undefined ? profile.is_approved : true,
+        is_paid: isPaid,
+        is_pro: isAdmin ? true : Boolean(profile.is_pro)
       } as UserProfile;
     });
   } catch (err) {
@@ -163,15 +176,56 @@ export async function getAllUsers(): Promise<UserProfile[]> {
 
 export async function adminApproveUser(userId: string): Promise<boolean> {
   try {
+    const user = await getUserProfile(userId);
+    const now = new Date().toISOString();
+
+    const currentApp = user?.app_credits ?? 0;
+    const currentAi = user?.ai_credits ?? 0;
+    const finalApp = currentApp < 1 ? 1 : currentApp;
+    const finalAi = currentAi < 100000 ? 100000 : currentAi;
+
     const { error } = await supabaseAdmin
       .from('profiles')
       .update({
         status: 'active',
         is_approved: true,
-        updated_at: new Date().toISOString()
+        is_paid: true,
+        app_credits: finalApp,
+        ai_credits: finalAi,
+        updated_at: now
       })
       .eq('id', userId);
-    return !error;
+
+    if (error) return false;
+
+    // Record audit trail if credits were granted
+    if (finalApp > currentApp) {
+      const txIdApp = `tx-app-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+      await supabaseAdmin.from('credit_transactions').insert({
+        id: txIdApp,
+        user_id: userId,
+        type: 'app_credit',
+        amount: finalApp - currentApp,
+        reason: 'Aktivasi Akun (ACC oleh Admin) - 1 Slot App',
+        balance_after: finalApp,
+        created_at: now
+      });
+    }
+
+    if (finalAi > currentAi) {
+      const txIdAi = `tx-ai-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+      await supabaseAdmin.from('credit_transactions').insert({
+        id: txIdAi,
+        user_id: userId,
+        type: 'ai_credit',
+        amount: finalAi - currentAi,
+        reason: 'Aktivasi Akun (ACC oleh Admin) - 100.000 Token AI',
+        balance_after: finalAi,
+        created_at: now
+      });
+    }
+
+    return true;
   } catch (err) {
     console.error('Failed to adminApproveUser:', err);
     return false;
@@ -331,12 +385,13 @@ export async function deductAiCredit(
   const user = await getUserProfile(userId);
   if (!user) return { success: false, balance: 0 };
 
-  const deduction = Math.max(1, Math.round(tokens));
-  if (user.ai_credits < deduction) {
-    return { success: false, balance: user.ai_credits };
+  const requestedDeduction = Math.max(1, Math.round(tokens));
+  const deduction = Math.min(user.ai_credits, requestedDeduction);
+  if (deduction <= 0 && user.ai_credits <= 0) {
+    return { success: false, balance: 0 };
   }
 
-  const newBalance = user.ai_credits - deduction;
+  const newBalance = Math.max(0, user.ai_credits - deduction);
   const now = new Date().toISOString();
 
   await supabaseAdmin
@@ -358,6 +413,18 @@ export async function deductAiCredit(
   return { success: true, balance: newBalance };
 }
 
+export async function markUserAsPaid(userId: string): Promise<boolean> {
+  try {
+    const { error } = await supabaseAdmin
+      .from('profiles')
+      .update({ is_paid: true, updated_at: new Date().toISOString() })
+      .eq('id', userId);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
 export async function addAppCredits(
   userId: string,
   count: number,
@@ -371,7 +438,7 @@ export async function addAppCredits(
 
   const { data } = await supabaseAdmin
     .from('profiles')
-    .update({ app_credits: newBalance, updated_at: now })
+    .update({ app_credits: newBalance, is_paid: true, updated_at: now })
     .eq('id', userId)
     .select()
     .single();
@@ -405,7 +472,7 @@ export async function addAiCredits(
 
   const { data } = await supabaseAdmin
     .from('profiles')
-    .update({ ai_credits: newBalance, updated_at: now })
+    .update({ ai_credits: newBalance, is_paid: true, updated_at: now })
     .eq('id', userId)
     .select()
     .single();
@@ -426,7 +493,7 @@ export async function addAiCredits(
   return profile as UserProfile;
 }
 
-export async function upgradeToPro(userId: string, days = 30): Promise<UserProfile | null> {
+export async function upgradeToPro(userId: string, days = 365): Promise<UserProfile | null> {
   const user = await getUserProfile(userId);
   if (!user) return null;
 
@@ -437,7 +504,7 @@ export async function upgradeToPro(userId: string, days = 30): Promise<UserProfi
 
   const { data } = await supabaseAdmin
     .from('profiles')
-    .update({ is_pro: true, pro_until, updated_at: now })
+    .update({ is_pro: true, is_paid: true, pro_until, updated_at: now })
     .eq('id', userId)
     .select()
     .single();
@@ -646,7 +713,7 @@ export async function getAppBySlug(slug: string): Promise<GeneratedApp | null> {
     const { data, error } = await supabaseAdmin
       .from('apps')
       .select('*')
-      .eq('slug', slug)
+      .or(`slug.eq.${slug},session_id.eq.${slug},id.eq.${slug}`)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -699,10 +766,19 @@ export async function saveApp(
 ): Promise<GeneratedApp> {
   const now = new Date().toISOString();
   const id = app.id || `app-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+
+  // Sanitize all file contents from null bytes \u0000 that break PostgreSQL JSONB
+  const sanitizedFiles: Record<string, string> = {};
+  if (app.files) {
+    for (const [k, v] of Object.entries(app.files)) {
+      sanitizedFiles[k] = typeof v === 'string' ? v.replace(/\u0000/g, '') : v;
+    }
+  }
+
   const record = {
     ...app,
     id,
-    files: app.files || {},
+    files: sanitizedFiles,
     created_at: now,
     updated_at: now
   };
@@ -920,4 +996,282 @@ export async function deleteStorageFile(userId: string, fileId: string): Promise
     return false;
   }
 }
+
+// ======================== USER SUBSCRIPTION & INVITATION OPERATIONS (PROFITLAB ARCHITECTURE) ========================
+
+export async function getUserSubscription(userId: string): Promise<UserSubscription | null> {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('user_subscriptions')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+
+    if (error || !data) return null;
+    return data as UserSubscription;
+  } catch (err) {
+    console.error('Failed to getUserSubscription:', err);
+    return null;
+  }
+}
+
+export async function upsertUserSubscription(
+  userId: string,
+  payload: {
+    subscription_end?: string;
+    is_free_access?: boolean;
+    is_active?: boolean;
+    notes?: string | null;
+  }
+): Promise<UserSubscription> {
+  const existing = await getUserSubscription(userId);
+  const now = new Date().toISOString();
+
+  const id = existing?.id || `sub_${userId}`;
+  const row = {
+    id,
+    user_id: userId,
+    subscription_end: payload.subscription_end || existing?.subscription_end || new Date(Date.now() + 30 * 86400000).toISOString(),
+    is_free_access: payload.is_free_access !== undefined ? payload.is_free_access : (existing?.is_free_access || false),
+    is_active: payload.is_active !== undefined ? payload.is_active : (existing?.is_active !== undefined ? existing.is_active : true),
+    notes: payload.notes !== undefined ? payload.notes : (existing?.notes || null),
+    updated_at: now
+  };
+
+  const { data, error } = await supabaseAdmin
+    .from('user_subscriptions')
+    .upsert(row)
+    .select()
+    .single();
+
+  if (error || !data) {
+    throw new Error(`Failed to upsert user subscription: ${error?.message}`);
+  }
+
+  return data as UserSubscription;
+}
+
+export async function extendUserSubscription(
+  userId: string,
+  days: number,
+  mode: 'smart' | 'now' = 'smart',
+  isFreeAccess?: boolean,
+  notes?: string
+): Promise<UserSubscription> {
+  const existing = await getUserSubscription(userId);
+  let baseDate = new Date();
+
+  if (mode === 'smart' && existing && existing.subscription_end) {
+    const currentEnd = new Date(existing.subscription_end);
+    if (currentEnd.getTime() > Date.now()) {
+      baseDate = currentEnd;
+    }
+  }
+
+  const newEnd = new Date(baseDate.getTime() + days * 86400000).toISOString();
+
+  return await upsertUserSubscription(userId, {
+    subscription_end: newEnd,
+    is_free_access: isFreeAccess !== undefined ? isFreeAccess : existing?.is_free_access,
+    is_active: true,
+    notes: notes !== undefined ? notes : existing?.notes
+  });
+}
+
+export async function bulkExtendSubscriptions(
+  userIds: string[],
+  days: number,
+  mode: 'smart' | 'now' = 'smart',
+  isFreeAccess?: boolean,
+  notes?: string
+): Promise<number> {
+  let count = 0;
+  for (const uid of userIds) {
+    try {
+      await extendUserSubscription(uid, days, mode, isFreeAccess, notes);
+      count++;
+    } catch (e) {
+      console.error(`Failed to extend subscription for user ${uid}:`, e);
+    }
+  }
+  return count;
+}
+
+export async function getAllInvitations(): Promise<UserInvitation[]> {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('user_invitations')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error || !data) return [];
+    return data as UserInvitation[];
+  } catch (err) {
+    console.error('Failed to getAllInvitations:', err);
+    return [];
+  }
+}
+
+export async function createInvitation(
+  email: string,
+  role: AppRole = 'user',
+  notes?: string
+): Promise<UserInvitation> {
+  const normEmail = email.trim().toLowerCase();
+  const id = `inv_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+  const row = {
+    id,
+    email: normEmail,
+    role,
+    notes: notes || null,
+    created_at: new Date().toISOString(),
+    accepted_at: null
+  };
+
+  const { data, error } = await supabaseAdmin
+    .from('user_invitations')
+    .upsert(row)
+    .select()
+    .single();
+
+  if (error || !data) {
+    throw new Error(`Failed to create invitation: ${error?.message}`);
+  }
+
+  return data as UserInvitation;
+}
+
+export async function deleteInvitation(id: string): Promise<boolean> {
+  try {
+    const { error } = await supabaseAdmin
+      .from('user_invitations')
+      .delete()
+      .eq('id', id);
+
+    return !error;
+  } catch (err) {
+    console.error('Failed to deleteInvitation:', err);
+    return false;
+  }
+}
+
+export async function updateInvitation(
+  id: string,
+  updates: { email?: string; role?: AppRole; notes?: string }
+): Promise<UserInvitation | null> {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('user_invitations')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error || !data) return null;
+    return data as UserInvitation;
+  } catch (err) {
+    console.error('Failed to updateInvitation:', err);
+    return null;
+  }
+}
+
+export async function getUsersWithSubscriptions(): Promise<UserWithSubscriptionData[]> {
+  try {
+    const [profilesRes, subsRes, invRes] = await Promise.all([
+      supabaseAdmin.from('profiles').select('*').order('created_at', { ascending: false }),
+      supabaseAdmin.from('user_subscriptions').select('*'),
+      supabaseAdmin.from('user_invitations').select('*').order('created_at', { ascending: false })
+    ]);
+
+    const profiles = profilesRes.data || [];
+    const subscriptions = subsRes.data || [];
+    const invitations = invRes.data || [];
+
+    const result: UserWithSubscriptionData[] = [];
+    const processedEmails = new Set<string>();
+
+    for (const p of profiles) {
+      const email = p.email?.toLowerCase() || '';
+      processedEmails.add(email);
+
+      const sub = subscriptions.find((s: any) => s.user_id === p.id) || null;
+      const inv = invitations.find((i: any) => i.email.toLowerCase() === email) || null;
+
+      const isAdmin =
+        p.username === 'demo' ||
+        p.role === 'admin' ||
+        p.email === 'demo@vibecoder.app' ||
+        p.email === 'rickyrizkymnf123@gmail.com' ||
+        p.username === 'ricky' ||
+        p.username === 'rickyrizky';
+
+      const isPaid = isAdmin || (p.is_paid !== undefined && p.is_paid !== null ? Boolean(p.is_paid) : (Boolean(p.is_pro) || Boolean(p.app_credits && p.app_credits > 0)));
+
+      result.push({
+        id: p.id,
+        email: p.email || 'Unknown',
+        username: p.username,
+        name: p.name || p.username || 'User',
+        phone_number: p.phone_number || null,
+        is_registered: true,
+        is_approved: p.is_approved !== false,
+        is_pro: isAdmin ? true : Boolean(p.is_pro),
+        is_paid: isPaid,
+        app_credits: p.app_credits || 0,
+        ai_credits: p.ai_credits || 0,
+        role: isAdmin ? 'admin' : (p.role || 'user'),
+        created_at: p.created_at || null,
+        subscription: sub ? {
+          id: sub.id,
+          subscription_end: sub.subscription_end,
+          is_free_access: isAdmin ? true : Boolean(sub.is_free_access),
+          is_active: sub.is_active !== false,
+          notes: sub.notes || null
+        } : (isAdmin ? {
+          id: `sub_${p.id}`,
+          subscription_end: new Date(Date.now() + 3650 * 86400000).toISOString(),
+          is_free_access: true,
+          is_active: true,
+          notes: 'Master Admin Access'
+        } : null),
+        invitation: inv ? {
+          id: inv.id,
+          role: inv.role as AppRole,
+          accepted_at: inv.accepted_at,
+          created_at: inv.created_at
+        } : null
+      });
+    }
+
+    // Add pending invitations that have not registered yet
+    for (const inv of invitations) {
+      const email = inv.email.toLowerCase();
+      if (!processedEmails.has(email)) {
+        result.push({
+          id: `inv_${inv.id}`,
+          email: inv.email,
+          name: 'Pending Registration',
+          phone_number: null,
+          is_registered: false,
+          is_approved: true,
+          role: (inv.role || 'user') as AppRole,
+          created_at: inv.created_at,
+          subscription: null,
+          invitation: {
+            id: inv.id,
+            role: (inv.role || 'user') as AppRole,
+            accepted_at: inv.accepted_at,
+            created_at: inv.created_at
+          }
+        });
+      }
+    }
+
+    return result;
+  } catch (err) {
+    console.error('Failed to getUsersWithSubscriptions:', err);
+    return [];
+  }
+}
+
 
