@@ -24,6 +24,8 @@ export interface UserWithSubscriptionData {
   id: string;
   email: string;
   username?: string;
+  subdomain?: string;
+  status?: 'active' | 'pending' | 'rejected' | 'suspended';
   name?: string | null;
   phone_number?: string | null;
   is_registered: boolean;

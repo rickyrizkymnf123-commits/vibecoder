@@ -33,10 +33,12 @@ import {
   Save,
   Bot,
   Sparkles,
-  Send
+  Send,
+  AppWindow
 } from 'lucide-react';
 import { UserProfile } from '@/lib/types';
 import { UserSubscriptionManagement } from '@/components/admin/UserSubscriptionManagement';
+import { AdminAppsManager } from '@/components/admin/AdminAppsManager';
 
 interface PlatformStats {
   totalUsers: number;
@@ -61,15 +63,15 @@ interface AiConfigData {
 
 export default function AdminPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'subscriptions' | 'approval' | 'users' | 'stats' | 'ai'>(() => {
+  const [activeTab, setActiveTab] = useState<'subscriptions' | 'approval' | 'users' | 'apps' | 'stats' | 'ai'>(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const urlTab = params.get('tab');
-      if (urlTab && ['subscriptions', 'approval', 'users', 'stats', 'ai'].includes(urlTab)) {
+      if (urlTab && ['subscriptions', 'approval', 'users', 'apps', 'stats', 'ai'].includes(urlTab)) {
         return urlTab as any;
       }
       const savedTab = localStorage.getItem('forge_admin_active_tab');
-      if (savedTab && ['subscriptions', 'approval', 'users', 'stats', 'ai'].includes(savedTab)) {
+      if (savedTab && ['subscriptions', 'approval', 'users', 'apps', 'stats', 'ai'].includes(savedTab)) {
         return savedTab as any;
       }
     }
@@ -80,8 +82,9 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'pending' | 'pro' | 'basic' | 'free'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'pending' | 'rejected' | 'pro' | 'basic' | 'free'>('all');
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [appsCount, setAppsCount] = useState<number | null>(null);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Modals state
@@ -173,7 +176,7 @@ export default function AdminPage() {
     fetchInitialData();
   }, []);
 
-  const handleTabChange = (tab: 'subscriptions' | 'approval' | 'users' | 'stats' | 'ai') => {
+  const handleTabChange = (tab: 'subscriptions' | 'approval' | 'users' | 'apps' | 'stats' | 'ai') => {
     setActiveTab(tab);
     if (typeof window !== 'undefined') {
       localStorage.setItem('forge_admin_active_tab', tab);
@@ -521,7 +524,10 @@ export default function AdminPage() {
   };
 
   // Filtered users
-  const pendingUsers = users.filter((u) => u.status === 'pending' || u.is_approved === false);
+  // User yang sudah DITOLAK tidak lagi dihitung menunggu ACC (tetap bisa dilihat & dihapus di tab Semua Pengguna)
+  const isAwaitingApproval = (u: { status?: string; is_approved?: boolean }) =>
+    u.status === 'pending' || (u.is_approved === false && u.status !== 'rejected');
+  const pendingUsers = users.filter(isAwaitingApproval);
   const filteredUsers = users.filter((u) => {
     const matchSearch =
       u.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -529,8 +535,9 @@ export default function AdminPage() {
       u.subdomain.toLowerCase().includes(searchTerm.toLowerCase());
 
     if (!matchSearch) return false;
-    if (statusFilter === 'active') return u.status === 'active' && u.is_approved !== false;
-    if (statusFilter === 'pending') return u.status === 'pending' || u.is_approved === false;
+    if (statusFilter === 'active') return u.status !== 'rejected' && u.status !== 'pending' && u.is_approved !== false;
+    if (statusFilter === 'pending') return isAwaitingApproval(u);
+    if (statusFilter === 'rejected') return u.status === 'rejected';
     if (statusFilter === 'pro') return Boolean(u.is_pro);
     if (statusFilter === 'basic') return Boolean(u.is_paid && !u.is_pro);
     if (statusFilter === 'free') return !u.is_paid;
@@ -653,6 +660,18 @@ export default function AdminPage() {
         >
           <Users className="w-4 h-4" />
           <span>Semua Pengguna ({users.length})</span>
+        </button>
+
+        <button
+          onClick={() => handleTabChange('apps')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 transition-all ${
+            activeTab === 'apps'
+              ? 'bg-rose-600/20 border border-rose-500/40 text-rose-300 shadow-lg shadow-rose-600/10'
+              : 'bg-slate-900/60 border border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-800'
+          }`}
+        >
+          <AppWindow className="w-4 h-4" />
+          <span>Semua Aplikasi{appsCount !== null ? ` (${appsCount})` : ''}</span>
         </button>
 
         <button
@@ -791,6 +810,16 @@ export default function AdminPage() {
                         <XCircle className="w-3.5 h-3.5" />
                         <span>Tolak</span>
                       </button>
+
+                      <button
+                        onClick={() => handleDeleteUser(user.id, user.username)}
+                        disabled={actionLoading === user.id}
+                        title="Hapus permanen"
+                        className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white font-semibold text-xs border border-slate-700 transition-colors flex items-center justify-center gap-1 disabled:opacity-50"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Hapus</span>
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -826,6 +855,7 @@ export default function AdminPage() {
                   <option value="all">Semua Status & Paket</option>
                   <option value="active">Aktif Disetujui</option>
                   <option value="pending">Menunggu ACC</option>
+                  <option value="rejected">Ditolak</option>
                   <option value="pro">👑 Paket Pro</option>
                   <option value="basic">⚡ Paket Basic</option>
                   <option value="free">🆓 Gratis (Belum Bayar)</option>
@@ -887,7 +917,8 @@ export default function AdminPage() {
                   ) : (
                     filteredUsers.map((u) => {
                       const isSelected = selectedUserIds.includes(u.id);
-                      const isPending = u.status === 'pending' || u.is_approved === false;
+                      const isPending = isAwaitingApproval(u);
+                      const isRejected = u.status === 'rejected';
                       const isAdmin = u.role === 'admin' || u.username === 'demo';
                       const currentTier: 'pro' | 'basic' | 'free' = u.is_pro ? 'pro' : u.is_paid ? 'basic' : 'free';
 
@@ -925,7 +956,11 @@ export default function AdminPage() {
                                   👑 Admin
                                 </span>
                               )}
-                              {isPending ? (
+                              {isRejected ? (
+                                <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                                  ✕ Ditolak
+                                </span>
+                              ) : isPending ? (
                                 <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
                                   ⏳ Menunggu ACC
                                 </span>
@@ -1038,6 +1073,8 @@ export default function AdminPage() {
         )}
 
         {/* ======================= TAB 3: STATISTIK ======================= */}
+        {activeTab === 'apps' && <AdminAppsManager onCountChange={setAppsCount} />}
+
         {activeTab === 'stats' && stats && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800">

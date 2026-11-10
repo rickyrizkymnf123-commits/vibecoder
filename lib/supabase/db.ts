@@ -880,6 +880,97 @@ export async function deleteApp(appId: string, userId: string): Promise<boolean>
   }
 }
 
+// ======================== ADMIN: APLIKASI ========================
+
+export interface AdminAppSummary {
+  id: string;
+  name: string;
+  slug: string;
+  status: string;
+  user_id: string;
+  owner_username: string | null;
+  owner_subdomain: string | null;
+  session_id: string | null;
+  custom_domain: string | null;
+  file_count: number;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+/** Daftar semua aplikasi untuk admin (tanpa isi berkas agar ringan). */
+export async function adminListApps(): Promise<AdminAppSummary[]> {
+  const [appsRes, profilesRes] = await Promise.all([
+    supabaseAdmin
+      .from('apps')
+      .select('id, name, slug, status, user_id, session_id, custom_domain, files, created_at, updated_at')
+      .order('updated_at', { ascending: false }),
+    supabaseAdmin.from('profiles').select('id, username, subdomain')
+  ]);
+  if (appsRes.error) throw new Error(appsRes.error.message);
+
+  const owners = new Map<string, { username: string | null; subdomain: string | null }>();
+  for (const p of profilesRes.data || []) {
+    owners.set(p.id, { username: p.username || null, subdomain: p.subdomain || p.username || null });
+  }
+
+  return (appsRes.data || []).map((a: any) => ({
+    id: a.id,
+    name: a.name || 'Aplikasi Web',
+    slug: a.slug,
+    status: a.status || 'draft',
+    user_id: a.user_id,
+    owner_username: owners.get(a.user_id)?.username ?? null,
+    owner_subdomain: owners.get(a.user_id)?.subdomain ?? null,
+    session_id: a.session_id || null,
+    custom_domain: a.custom_domain || null,
+    file_count: a.files && typeof a.files === 'object' ? Object.keys(a.files).length : 0,
+    created_at: a.created_at || null,
+    updated_at: a.updated_at || null
+  }));
+}
+
+/**
+ * Hapus banyak aplikasi sekaligus (admin). Sesi chat terkait direset agar tidak menunjuk ke aplikasi
+ * yang sudah tidak ada, lalu custom domain yang terpasang dilepas dari Vercel (best effort).
+ */
+export async function adminDeleteApps(
+  appIds: string[]
+): Promise<{ deletedCount: number; customDomains: string[]; errors: string[] }> {
+  const ids = Array.from(new Set(appIds.filter((id) => typeof id === 'string' && id.length > 0)));
+  if (ids.length === 0) return { deletedCount: 0, customDomains: [], errors: [] };
+
+  const { data: apps, error: findErr } = await supabaseAdmin
+    .from('apps')
+    .select('id, slug, session_id, custom_domain')
+    .in('id', ids);
+  if (findErr) return { deletedCount: 0, customDomains: [], errors: [`Gagal membaca aplikasi: ${findErr.message}`] };
+
+  const found = apps || [];
+  const errors: string[] = [];
+  if (found.length < ids.length) errors.push(`${ids.length - found.length} aplikasi tidak ditemukan (mungkin sudah dihapus)`);
+  if (found.length === 0) return { deletedCount: 0, customDomains: [], errors };
+
+  const { data: deleted, error } = await supabaseAdmin
+    .from('apps')
+    .delete()
+    .in('id', found.map((a: any) => a.id))
+    .select('id');
+  if (error) {
+    console.error('Failed to adminDeleteApps:', error);
+    return { deletedCount: 0, customDomains: [], errors: [...errors, `Gagal menghapus aplikasi: ${error.message}`] };
+  }
+
+  // Reset sesi chat yang menunjuk ke aplikasi terhapus (cocokkan lewat session_id maupun app_slug)
+  const sessionIds = found.map((a: any) => a.session_id).filter(Boolean);
+  const slugs = found.map((a: any) => a.slug).filter(Boolean);
+  const reset = { app_slug: null, status: 'active', updated_at: new Date().toISOString() };
+  if (sessionIds.length) await supabaseAdmin.from('chat_sessions').update(reset).in('id', sessionIds);
+  if (slugs.length) await supabaseAdmin.from('chat_sessions').update(reset).in('app_slug', slugs);
+
+  const customDomains = found.map((a: any) => a.custom_domain).filter(Boolean);
+  return { deletedCount: deleted?.length || 0, customDomains, errors };
+}
+
 // ======================== PAYMENTS ========================
 
 export async function createPayment(
@@ -1231,6 +1322,8 @@ export async function getUsersWithSubscriptions(): Promise<UserWithSubscriptionD
         id: p.id,
         email: p.email || 'Unknown',
         username: p.username,
+        subdomain: p.subdomain || p.username || '',
+        status: p.status || 'active',
         name: p.name || p.username || 'User',
         phone_number: p.phone_number || null,
         is_registered: true,
