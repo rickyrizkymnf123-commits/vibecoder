@@ -1,0 +1,84 @@
+/* Animasi khusus landing page Kilat Tools */
+
+@keyframes kt-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@keyframes kt-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+@keyframes kt-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+@keyframes kt-dash {
+  to { stroke-dashoffset: -40; }
+}
+@keyframes kt-ping {
+  0% { transform: scale(1); opacity: 0.7; }
+  100% { transform: scale(1.9); opacity: 0; }
+}
+@keyframes kt-shimmer {
+  from { background-position: -200% 0; }
+  to { background-position: 200% 0; }
+}
+@keyframes kt-pop {
+  0% { transform: scale(0.6); opacity: 0; }
+  70% { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); }
+}
+@keyframes kt-slide-up {
+  from { transform: translateY(14px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes kt-grid-move {
+  from { background-position: 0 0; }
+  to { background-position: 0 48px; }
+}
+
+.kt-marquee { animation: kt-marquee 40s linear infinite; }
+.kt-marquee-reverse { animation: kt-marquee 46s linear infinite reverse; }
+.kt-marquee-wrap:hover .kt-marquee,
+.kt-marquee-wrap:hover .kt-marquee-reverse { animation-play-state: paused; }
+.kt-float { animation: kt-float 5s ease-in-out infinite; }
+.kt-caret { animation: kt-blink 1s step-end infinite; }
+.kt-dash { stroke-dasharray: 4 6; animation: kt-dash 1.2s linear infinite; }
+.kt-ping { animation: kt-ping 1.6s ease-out infinite; }
+.kt-pop { animation: kt-pop 0.45s ease-out both; }
+.kt-slide-up { animation: kt-slide-up 0.4s ease-out both; }
+.kt-shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(251, 191, 36, 0.18) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: kt-shimmer 2.2s linear infinite;
+}
+.kt-grid-bg {
+  background-image:
+    linear-gradient(rgba(251, 191, 36, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(251, 191, 36, 0.07) 1px, transparent 1px);
+  background-size: 48px 48px;
+  animation: kt-grid-move 6s linear infinite;
+  mask-image: radial-gradient(ellipse at center top, black 30%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse at center top, black 30%, transparent 75%);
+}
+
+/* Muncul saat di-scroll */
+.kt-reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.kt-reveal.is-in { opacity: 1; transform: none; }
+
+.kt-no-scrollbar { scrollbar-width: none; }
+.kt-no-scrollbar::-webkit-scrollbar { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .kt-marquee, .kt-marquee-reverse, .kt-float, .kt-dash, .kt-ping, .kt-shimmer, .kt-grid-bg { animation: none !important; }
+  .kt-reveal { opacity: 1; transform: none; transition: none; }
+}
+
+@keyframes kt-progress {
+  from { width: 0; }
+  to { width: 100%; }
+}
