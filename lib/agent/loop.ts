@@ -310,17 +310,18 @@ Aplikasi web ini SUDAH ADA dan BERFUNGSI dengan baik di workspace pengguna.
 DAFTAR BERKAS PROYEK SAAT INI:
 ${existingFiles.map((f) => `- ${f}`).join('\n')}
 
-PANDUAN STRUKTUR BERKAS APLIKASI:
+PANDUAN STRUKTUR BERKAS APLIKASI (hanya berlaku bila berkasnya ada di daftar di atas):
 - 'public/css/style.css' -> Berisi seluruh palet warna (CSS variables :root), tema dark/light, styling komponen, kartu, tombol, modal dialog.
 - 'public/index.html' -> Berisi struktur DOM HTML, teks konten landing page, navbar, tata letak, judul, form modal.
 - 'public/js/app.js' -> Berisi logika JavaScript interaktif, fungsi event handler, kalkulasi, state aplikasi, autentikasi, CRUD transaksi/barang.
 - 'server.js' -> Berisi server backend Express dan REST API.
 - 'data/*.json' -> Berisi dataset database JSON lokal.
 
-SEMANTIC TARGETED BUG SURGEON & PERBAIKAN INSTAN 1-TURN (3-5 DETIK):
+SEMANTIC TARGETED BUG SURGEON (REVISI TEPAT SASARAN):
 1. PEMAHAMAN SEMANTIK OTOMATIS: Pahami maksud pengguna terlepas dari gaya bahasa, bahasa daerah, slang, singkatan, atau typo (misal: "ga bisa login", "gabisa masuk", "gagal tambah barang", "tombol macet", "struk ga keluar", "error pas klik simpan", "warna kurang terang", "mode gelap", dsb.).
 2. TARGETED SURGICAL FIX (1-TURN CEPAT):
-   - Jika pengguna minta ubah warna / tema / mode gelap / styling / teks: HANYA buka dan perbarui 'public/css/style.css' atau 'public/index.html'. DILARANG membaca 'app.js', 'server.js', atau menjalankan 'bash node --check'.
+   - Struktur tiap aplikasi berbeda: banyak aplikasi (mis. ebook tool, kalkulator, landing page) menyimpan HTML, CSS, dan JavaScript dalam SATU berkas 'public/index.html'. Selalu cari bagian yang relevan di berkas yang BENAR-BENAR ada, jangan berasumsi ada style.css/app.js.
+   - Jika pengguna minta ubah warna / tema / styling / teks: perbarui berkas tempat style/teks itu berada (CSS terpisah atau tag <style>/HTML di index.html). Tidak perlu menjalankan 'bash node --check'.
    - Jika pengguna melaporkan kendala login / otentikasi / sesi: Langsung perbaiki fungsi login di 'public/js/app.js' (pastikan fallback mock admin/user, set localStorage, dan alihkan tampilan secara mulus).
    - Jika pengguna melaporkan kendala tambah barang / inventory / transaksi: Perbaiki event handler submit form di 'public/js/app.js' (pastikan 'e.preventDefault()', validasi form, append ke array data/state, save ke localStorage/API, render ulang tabel, dan tutup modal).
 3. PROTOKOL EKSEKUSI REVISI:
@@ -1716,6 +1717,14 @@ async function requestChatCompletion(
       if (isFollowUp && writtenFiles.length === 0 && toolCallsHistory.length === 0) {
         break;
       }
+      if (isFollowUp && !deployedApp) {
+        if (successfulEdits > 0) break;
+        contents.push({
+          role: 'user',
+          parts: [{ text: 'Belum ada perubahan yang berhasil disimpan (edit_file gagal / belum dipanggil). Panggil read_file untuk berkas target, salin teks target PERSIS dari isi berkas, lalu panggil edit_file lagi. Jika perubahannya banyak, tulis ulang seluruh berkas dengan write_file. Jangan menyatakan selesai sebelum perubahan tersimpan.' }]
+        });
+        continue;
+      }
       if (!deployedApp) {
         const hasHtml = writtenFiles.some((f) => f.includes('index.html'));
         const hasJs = writtenFiles.some((f) => f.includes('app.js'));
@@ -1736,6 +1745,12 @@ async function requestChatCompletion(
         break;
       }
     }
+  }
+
+  if (isFollowUp && successfulEdits === 0 && toolCallsHistory.some((t) => t.tool === 'edit_file' || t.tool === 'write_file')) {
+    const failNote = '⚠️ Revisi ini BELUM tersimpan: AI gagal menemukan bagian kode yang mau diubah, jadi aplikasi tidak berubah. Coba kirim ulang dengan menyebut bagian yang dimaksud lebih spesifik (mis. judul/teks tombolnya).';
+    summaryMessage += (summaryMessage ? '\n\n' : '') + failNote;
+    await onEvent({ type: 'message', content: failNote, generationMode: 'live-ai' });
   }
 
   // Jangan terbitkan aplikasi setengah jadi: jika index.html merujuk berkas yang belum ada, simpan sebagai draft saja.
