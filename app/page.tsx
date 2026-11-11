@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import './landing.css';
 import HeroVideoDemo from '@/components/landing/HeroVideoDemo';
+import YouTubeDemo from '@/components/landing/YouTubeDemo';
+import { getYouTubeId } from '@/lib/youtube';
 import AppStudioDemo from '@/components/landing/AppStudioDemo';
 import CostBars from '@/components/landing/CostBars';
 import ScrollStory from '@/components/landing/ScrollStory';
@@ -39,6 +41,10 @@ import {
 } from 'lucide-react';
 
 const CTA_HREF = '/register';
+
+// Link video demo YouTube (watch / youtu.be / shorts). Kosong = pakai demo animasi bawaan.
+// Bisa diisi lewat env NEXT_PUBLIC_DEMO_YOUTUBE_URL di Vercel (lalu redeploy).
+const DEMO_YOUTUBE_URL = process.env.NEXT_PUBLIC_DEMO_YOUTUBE_URL || '';
 
 const aiTeam = [
   { code: 'AI-01', role: 'ANALIS', title: 'Penerjemah Ide', desc: 'Ubah obrolanmu jadi daftar fitur & alur aplikasi yang jelas.', icon: MessageSquareText },
@@ -171,6 +177,7 @@ function Cell({ v, strong }: { v: string; strong?: boolean }) {
 }
 
 export default function LandingPage() {
+  const youtubeId = getYouTubeId(DEMO_YOUTUBE_URL);
   const waLink = buildAdminWhatsAppLink('Halo Admin Kilat Tools, saya mau tanya-tanya soal paketnya.');
 
   return (
@@ -253,14 +260,22 @@ export default function LandingPage() {
         <Reveal className="text-center">
           <StepBadge n={1}>Langkah 1 · Tonton dulu</StepBadge>
           <h2 className="mt-4 text-2xl font-black text-white sm:text-4xl">
-            Lihat <span className="text-amber-300">dalam 26 detik</span> gimana aplikasi jadi
+            {youtubeId ? (
+              <>
+                Tonton <span className="text-amber-300">video singkat ini</span> dulu sebelum scroll
+              </>
+            ) : (
+              <>
+                Lihat <span className="text-amber-300">dalam 26 detik</span> gimana aplikasi jadi
+              </>
+            )}
           </h2>
           <p className="mx-auto mt-3 max-w-2xl text-sm text-slate-400">
             Dari ngetik ide, AI merancang, nulis kode, ngetes, sampai aplikasi kasir online. Habis ini, coba sendiri studionya di bawah.
           </p>
         </Reveal>
         <Reveal className="mt-8" delay={150}>
-          <HeroVideoDemo />
+          {youtubeId ? <YouTubeDemo videoId={youtubeId} /> : <HeroVideoDemo />}
         </Reveal>
       </section>
 
