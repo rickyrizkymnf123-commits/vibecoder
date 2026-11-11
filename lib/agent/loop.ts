@@ -1055,6 +1055,108 @@ function parseSseResponse(rawText: string): any {
   };
 }
 
+type ChatCompletionResult =
+  | { ok: true; data: any }
+  | { ok: false; status: number; error: string };
+
+/**
+ * Panggil endpoint chat/completions dengan streaming (SSE).
+ * Router AI kadang butuh > 90 detik untuk berkas besar. Dengan streaming, koneksi tidak diputus selama
+ * AI masih mengirim data; yang memutus hanya:
+ *  - firstByteMs: belum ada data sama sekali dalam waktu ini (router macet/antre terlalu lama)
+ *  - idleMs: berhenti mengirim data di tengah jalan selama waktu ini
+ *  - totalMs: batas keras sesuai sisa anggaran waktu fungsi
+ * Hasilnya dirakit ulang jadi bentuk respons non-stream ({ choices: [{ message, finish_reason }], usage }).
+ */
+async function requestChatCompletion(
+  url: string,
+  apiKey: string,
+  body: any,
+  opts: { totalMs: number; firstByteMs: number; idleMs: number }
+): Promise<ChatCompletionResult> {
+  const controller = new AbortController();
+  let abortReason = '';
+  const abort = (reason: string) => {
+    if (!abortReason) abortReason = reason;
+    controller.abort();
+  };
+  const totalTimer = setTimeout(() => abort(`AI tidak selesai dalam ${Math.round(opts.totalMs / 1000)} detik`), opts.totalMs);
+  let idleTimer: ReturnType<typeof setTimeout> | null = setTimeout(
+    () => abort(`AI belum merespons setelah ${Math.round(opts.firstByteMs / 1000)} detik`),
+    opts.firstByteMs
+  );
+  const resetIdle = () => {
+    if (idleTimer) clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => abort(`AI berhenti mengirim data selama ${Math.round(opts.idleMs / 1000)} detik`), opts.idleMs);
+  };
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream, application/json',
+        Authorization: `Bearer ${apiKey}`
+      },
+      signal: controller.signal,
+      body: JSON.stringify({ ...body, stream: true })
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      return { ok: false, status: res.status, error: text || `HTTP ${res.status}` };
+    }
+
+    // Kumpulkan seluruh body; setiap potongan data yang masuk mereset timer diam.
+    let raw = '';
+    if (res.body) {
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      resetIdle();
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        raw += decoder.decode(value, { stream: true });
+        resetIdle();
+      }
+      raw += decoder.decode();
+    } else {
+      raw = await res.text();
+    }
+
+    const trimmed = raw.trim();
+    if (!trimmed) return { ok: false, status: 0, error: 'Respons AI kosong' };
+
+    // Router mungkin tetap mengirim JSON biasa walau diminta stream.
+    if (trimmed.startsWith('{')) {
+      try {
+        const json = JSON.parse(trimmed);
+        if (json.error) return { ok: false, status: 502, error: JSON.stringify(json.error).slice(0, 500) };
+        return { ok: true, data: json };
+      } catch {
+        // lanjut coba sebagai SSE
+      }
+    }
+
+    // Error yang dikirim di tengah stream: data: {"error": ...}
+    const errLine = trimmed.split('\n').find((l) => /^data:\s*\{\s*"error"/.test(l.trim()));
+    if (errLine) return { ok: false, status: 502, error: errLine.replace(/^data:\s*/, '').slice(0, 500) };
+
+    const data = parseSseResponse(trimmed);
+    const msg = data.choices?.[0]?.message;
+    if (!msg?.content && !msg?.tool_calls?.length) {
+      return { ok: false, status: 502, error: 'Stream AI selesai tanpa isi' };
+    }
+    return { ok: true, data };
+  } catch (err: any) {
+    return { ok: false, status: 0, error: abortReason || err?.message || 'Koneksi ke AI terputus' };
+  } finally {
+    clearTimeout(totalTimer);
+    if (idleTimer) clearTimeout(idleTimer);
+  }
+}
+
   // =========================================================================
   // 1. EKSEKUSI VIA OPENAI-COMPATIBLE API (KoboiLLM / OpenRouter / DeepSeek)
   // =========================================================================
@@ -1111,7 +1213,8 @@ function parseSseResponse(rawText: string): any {
       }
       turn++;
 
-      let res: Response | null = null;
+      let data: any = null;
+      let lastStatus = 0;
       let lastErrText = '';
       const MAX_RETRIES = 2;
 
@@ -1132,69 +1235,59 @@ function parseSseResponse(rawText: string): any {
       };
 
       for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-        try {
-          const isTurn1 = turn === 1 && !isFollowUp;
-          // Selama berkas inti masih kurang, paksa model memanggil tool (bukan sekadar membalas teks).
-          const coreIncomplete = !isTurn1 && writtenFiles.length > 0 && getMissingReferencedAssets(wsDir).length > 0;
-          const reqBody: any = {
-            model: aiConfig.defaultModel || 'ag/gemini-3-flash',
-            messages: getOptimizedMessages(messages),
-            tools: openAiTools,
-            tool_choice: isTurn1
-              ? { type: 'function', function: { name: 'write_file' } }
-              : coreIncomplete
-                ? 'required'
-                : 'auto',
-            temperature: 0.2,
-            reasoning_effort: 'low',
-            // Tanpa max_tokens router memotong output di ~8.192 token -> tool call berkas besar (app.js) terbuang.
-            max_tokens: 32000,
-            stream: false
-          };
+        const isTurn1 = turn === 1 && !isFollowUp;
+        // Selama berkas inti masih kurang, paksa model memanggil tool (bukan sekadar membalas teks).
+        const coreIncomplete = !isTurn1 && writtenFiles.length > 0 && getMissingReferencedAssets(wsDir).length > 0;
+        const reqBody: any = {
+          model: aiConfig.defaultModel || 'ag/gemini-3-flash',
+          messages: getOptimizedMessages(messages),
+          tools: openAiTools,
+          tool_choice: isTurn1
+            ? { type: 'function', function: { name: 'write_file' } }
+            : coreIncomplete
+              ? 'required'
+              : 'auto',
+          temperature: 0.2,
+          reasoning_effort: 'low',
+          // Tanpa max_tokens router memotong output di ~8.192 token -> tool call berkas besar (app.js) terbuang.
+          max_tokens: 32000
+        };
 
-          res = await fetch(completionsUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${aiConfig.apiKey}`
-            },
-            // Menulis berkas besar bisa > 45 detik; beri hingga 90 detik tapi jangan melewati sisa anggaran waktu.
-            signal: AbortSignal.timeout(Math.max(15000, Math.min(90000, remainingMs() - 10000))),
-            body: JSON.stringify(reqBody)
-          });
+        // Streaming: AI yang lambat tapi masih menulis tidak diputus. Batas total = sisa anggaran waktu.
+        const totalMs = Math.max(20000, remainingMs() - 12000);
+        const result = await requestChatCompletion(completionsUrl, aiConfig.apiKey, reqBody, {
+          totalMs,
+          firstByteMs: Math.min(totalMs, 150000),
+          idleMs: 60000
+        });
 
-          if (res.ok) {
-            lastErrText = '';
-            break;
-          } else {
-            lastErrText = await res.text();
-            console.warn(`[AI Provider Turn ${turn} Attempt ${attempt} HTTP ${res.status}]:`, lastErrText.substring(0, 150));
-            if ([429, 502, 503, 504].includes(res.status) && attempt < MAX_RETRIES) {
-              await onEvent({
-                type: 'plan',
-                content: `Koneksi AI sibuk (${res.status}). Mengulang otomatis...`,
-                generationMode: 'live-ai'
-              });
-              await new Promise((r) => setTimeout(r, 1500 * attempt));
-              continue;
-            }
-            break;
-          }
-        } catch (fetchErr: any) {
-          lastErrText = fetchErr.message;
-          console.warn(`[AI Provider Fetch Error turn ${turn} attempt ${attempt}]:`, fetchErr.message);
-          if (attempt < MAX_RETRIES && remainingMs() > 40000) {
-            await onEvent({
-              type: 'plan',
-              content: `Waktu respons AI melambat (${fetchErr.message}). Mengulang cepat (percobaan 2/2)...`,
-              generationMode: 'live-ai'
-            });
-            await new Promise((r) => setTimeout(r, 1000));
-          }
+        if (result.ok) {
+          data = result.data;
+          lastErrText = '';
+          lastStatus = 0;
+          break;
         }
+
+        lastStatus = result.status;
+        lastErrText = result.error;
+        console.warn(`[AI Provider Turn ${turn} Attempt ${attempt} status=${result.status}]:`, result.error.substring(0, 200));
+
+        const retryable = result.status === 0 || [408, 429, 500, 502, 503, 504].includes(result.status);
+        if (retryable && attempt < MAX_RETRIES && remainingMs() > 45000) {
+          await onEvent({
+            type: 'plan',
+            content: result.status
+              ? `Koneksi AI sibuk (${result.status}). Mengulang otomatis...`
+              : `Respons AI melambat (${result.error}). Mengulang otomatis...`,
+            generationMode: 'live-ai'
+          });
+          await new Promise((r) => setTimeout(r, 1500 * attempt));
+          continue;
+        }
+        break;
       }
 
-      if (!res || !res.ok) {
+      if (!data) {
         await closeStep('failed', { error: (lastErrText || 'Tidak ada respons dari AI').substring(0, 300) });
         // Fallback: If custom router failed and GEMINI_API_KEY is available, try direct Gemini
         if (geminiApiKey) {
@@ -1236,9 +1329,9 @@ function parseSseResponse(rawText: string): any {
           }
         }
 
-        const errMsg = !res
-          ? `Gagal terhubung ke penyedia AI: ${lastErrText}`
-          : `AI Provider mengembalikan error (${res.status}): ${lastErrText.substring(0, 200)}`;
+        const errMsg = lastStatus
+          ? `AI Provider mengembalikan error (${lastStatus}): ${lastErrText.substring(0, 200)}. Silakan kirim ulang pesan sebentar lagi.`
+          : `Gagal terhubung ke penyedia AI: ${lastErrText}. Server AI sedang lambat atau sibuk, silakan kirim ulang pesan sebentar lagi.`;
 
         console.error(`[Custom AI Fatal Error turn ${turn}]`, errMsg);
 
@@ -1262,29 +1355,6 @@ function parseSseResponse(rawText: string): any {
           generationMode: 'live-ai',
           fallbackReason: errMsg
         };
-      }
-
-      let data: any;
-      const rawText = await res.text();
-      try {
-        data = JSON.parse(rawText);
-      } catch (jsonErr: any) {
-        // Fallback for proxies that force SSE chunks even with stream: false
-        if (rawText.includes('data:')) {
-          try {
-            data = parseSseResponse(rawText);
-          } catch (sseErr: any) {
-            const errMsg = `Format respons AI tidak valid JSON: ${jsonErr.message}`;
-            await closeStep('failed', { error: errMsg });
-            await onEvent({ type: 'error', message: errMsg, generationMode: 'live-ai' });
-            break;
-          }
-        } else {
-          const errMsg = `Format respons AI tidak valid JSON: ${jsonErr.message}`;
-          await closeStep('failed', { error: errMsg });
-          await onEvent({ type: 'error', message: errMsg, generationMode: 'live-ai' });
-          break;
-        }
       }
 
       const choice = data.choices?.[0];
