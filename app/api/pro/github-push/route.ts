@@ -5,7 +5,7 @@ import { pushToGitHub } from '@/lib/builder/github';
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { collectAllFiles, getWorkspaceDir } from '@/lib/agent/executor';
+import { collectAllFiles, getWorkspaceDir, mergeAppFiles } from '@/lib/agent/executor';
 
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
 
   const wsDir = app.session_id ? getWorkspaceDir(app.session_id) : '';
   const diskFiles = wsDir && fs.existsSync(wsDir) ? collectAllFiles(wsDir) : {};
-  const filesToPush = { ...(app.files || {}), ...diskFiles };
+  const filesToPush = mergeAppFiles(app.files, diskFiles);
 
   const pushResult = await pushToGitHub({
     repoUrl,

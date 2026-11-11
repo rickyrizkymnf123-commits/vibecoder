@@ -18,7 +18,8 @@ import {
   executePublishApp,
   getWorkspaceDir,
   resolveSafePath,
-  collectAllFiles
+  collectAllFiles,
+  isPlaceholderContent
 } from './executor';
 import { ToolCallItem, TodoItem, GeneratedApp } from '../types';
 
@@ -289,7 +290,7 @@ export function syncTodoListProgress(todoList: TodoItem[], currentAction: { tool
   return todoList;
 }
 
-function getRevisionSystemPrompt(existingFiles: string[]): string {
+function getRevisionSystemPrompt(existingFiles: string[], wsDir?: string): string {
   const hasHtml = existingFiles.some((f) => f.includes('index.html') || f.endsWith('.html'));
 
   if (!hasHtml) {
@@ -322,14 +323,44 @@ SEMANTIC TARGETED BUG SURGEON & PERBAIKAN INSTAN 1-TURN (3-5 DETIK):
    - Jika pengguna minta ubah warna / tema / mode gelap / styling / teks: HANYA buka dan perbarui 'public/css/style.css' atau 'public/index.html'. DILARANG membaca 'app.js', 'server.js', atau menjalankan 'bash node --check'.
    - Jika pengguna melaporkan kendala login / otentikasi / sesi: Langsung perbaiki fungsi login di 'public/js/app.js' (pastikan fallback mock admin/user, set localStorage, dan alihkan tampilan secara mulus).
    - Jika pengguna melaporkan kendala tambah barang / inventory / transaksi: Perbaiki event handler submit form di 'public/js/app.js' (pastikan 'e.preventDefault()', validasi form, append ke array data/state, save ke localStorage/API, render ulang tabel, dan tutup modal).
-3. PROTOKOL EKSEKUSI REVISI 1-TURN:
-   - Langkah 1: Buat 1 todo singkat via 'todo_write' (contoh: "Terapkan palet dark theme di style.css").
-   - Langkah 2: Terapkan perubahan terarah via 'edit_file' atau 'write_file' pada SATU berkas target.
-   - Langkah 3: Segera panggil 'publish_app' (gunakan nama dan slug aplikasi asli yang sedang aktif) agar pembaruan langsung terbit ke Live Preview dalam 3 detik!
+3. PROTOKOL EKSEKUSI REVISI:
+   - Langkah 1: Temukan bagian kode yang relevan. Isi berkas utama TERLAMPIR di bawah (versi TERBARU, sudah termasuk semua revisi sebelumnya). Jika berkas yang dibutuhkan tidak terlampir, panggil 'read_file' dulu.
+   - Langkah 2: Terapkan perubahan via 'edit_file' — 'target_content' WAJIB disalin PERSIS (karakter demi karakter) dari isi berkas terbaru, bukan dari ingatan/percakapan sebelumnya. Jika perubahannya besar atau menyentuh banyak bagian, tulis ulang berkas utuh dengan 'write_file'.
+   - Langkah 3: Periksa hasil tool. Jika edit_file mengembalikan error, perbaiki target_content lalu coba lagi. Jangan pernah menyatakan revisi selesai bila belum ada perubahan yang berhasil.
+   - Langkah 4: Panggil 'publish_app' (gunakan nama dan slug aplikasi asli yang sedang aktif).
+   - Pertahankan semua fitur & revisi sebelumnya; ubah HANYA yang diminta pengguna.
 4. DILARANG KERAS:
-   - DILARANG membaca berkas-berkas yang tidak ada hubungannya (misal membaca app.js padahal hanya ganti warna).
    - DILARANG menjalankan pengujian terminal 'bash' untuk revisi CSS/HTML teks.
-   - DILARANG membuat nama aplikasi atau slug baru (seperti "KasirPro - Dark Mode") saat revisi; selalu pertahankan nama & slug aplikasi utama.`;
+   - DILARANG membuat nama aplikasi atau slug baru (seperti "KasirPro - Dark Mode") saat revisi; selalu pertahankan nama & slug aplikasi utama.${buildCurrentFilesContext(existingFiles, wsDir)}`;
+}
+
+/** Lampirkan isi berkas teks utama (versi terbaru) ke prompt revisi agar edit_file bisa menyalin teks target dengan tepat. */
+function buildCurrentFilesContext(existingFiles: string[], wsDir?: string): string {
+  if (!wsDir) return '';
+  const BUDGET = 90000;
+  const priority = (f: string) => (f.endsWith('.html') ? 0 : f.endsWith('.css') ? 1 : f.endsWith('.js') && f.startsWith('public/') ? 2 : 3);
+  const candidates = existingFiles
+    .filter((f) => /\.(html|css|js|mjs)$/i.test(f) && !f.startsWith('data/') && f !== 'server.js' && !f.includes('node_modules'))
+    .sort((a, b) => priority(a) - priority(b));
+  let used = 0;
+  const parts: string[] = [];
+  const skipped: string[] = [];
+  for (const f of candidates) {
+    try {
+      const content = fs.readFileSync(path.join(wsDir, f), 'utf8');
+      if (content.startsWith('[Berkas tersimpan di disk')) continue;
+      if (used + content.length > BUDGET) {
+        skipped.push(f);
+        continue;
+      }
+      used += content.length;
+      parts.push(`===== BERKAS: ${f} =====\n${content}\n===== AKHIR ${f} =====`);
+    } catch {}
+  }
+  if (parts.length === 0) return '';
+  return `\n\nISI BERKAS TERBARU DI WORKSPACE (gunakan ini sebagai acuan target_content):\n${parts.join('\n\n')}${
+    skipped.length ? `\n\n(Berkas lain tidak dilampirkan karena ukuran: ${skipped.join(', ')} — gunakan read_file bila perlu.)` : ''
+  }`;
 }
 
 function getNextStepGuidance(writtenFiles: string[], toolCallsHistory: ToolCallItem[], isFollowUp = false): string {
@@ -627,18 +658,26 @@ export async function runAgenticLoop(options: RunAgentOptions): Promise<AgentRun
   const TIME_BUDGET_MS = 240000;
   const remainingMs = () => TIME_BUDGET_MS - (Date.now() - loopStartedAt);
   let publishBlockedCount = 0;
+  let revisionPublishBlocked = 0;
 
   // Inisialisasi workspace fisik di disk & periksa database
   const wsDir = getWorkspaceDir(sessionId);
   const dbApp = await getAppBySlug(sessionId);
 
-  // Jika ada di database tapi belum di-disk, lakukan sinkronisasi
+  // Sinkronkan workspace disk dari database. DB adalah sumber kebenaran: salinan di /tmp bisa basi
+  // (revisi sebelumnya mungkin disimpan oleh instance serverless lain), jadi SELALU timpa dengan versi DB.
+  // Tanpa ini, revisi baru diterapkan ke versi lama dan revisi sebelumnya "hilang".
   if (dbApp && dbApp.files && Object.keys(dbApp.files).length > 0) {
     for (const [relPath, content] of Object.entries(dbApp.files)) {
-      const full = path.join(wsDir, relPath);
-      if (!fs.existsSync(full) && !content.startsWith('[Berkas tersimpan di disk')) {
+      if (typeof content !== 'string' || isPlaceholderContent(content)) continue;
+      try {
+        const full = resolveSafePath(wsDir, relPath);
         fs.mkdirSync(path.dirname(full), { recursive: true });
-        fs.writeFileSync(full, content, 'utf8');
+        const dataUrl = content.match(/^data:[^;,]+;base64,(.*)$/s);
+        if (dataUrl) fs.writeFileSync(full, Buffer.from(dataUrl[1], 'base64'));
+        else if (!fs.existsSync(full) || fs.readFileSync(full, 'utf8') !== content) fs.writeFileSync(full, content, 'utf8');
+      } catch (syncErr) {
+        console.warn('[Agent] Gagal sinkronisasi berkas dari DB:', relPath, syncErr);
       }
     }
   }
@@ -678,14 +717,14 @@ export async function runAgenticLoop(options: RunAgentOptions): Promise<AgentRun
   }
 
   const isFollowUp = existingFiles.length > 0 || Boolean(dbApp);
-  const activeSystemPrompt = isFollowUp ? getRevisionSystemPrompt(existingFiles) : FRESH_BUILD_SYSTEM_PROMPT;
+  const activeSystemPrompt = isFollowUp ? getRevisionSystemPrompt(existingFiles, wsDir) : FRESH_BUILD_SYSTEM_PROMPT;
   const aiConfig = await getAiConfigAsync();
 
   // =========================================================================
   // 1. SMART INTENT CLASSIFIER: Deteksi Pertanyaan / Sapaan / Diskusi (Tanpa Buat Kode)
   // =========================================================================
   if (isGeneralConversationOrQuestion(userPrompt, isFollowUp) && (!options.attachments || options.attachments.length === 0)) {
-    const discussionAnswer = await generateDiscussionResponse(userPrompt, activeSystemPrompt, aiConfig, existingFiles, dbApp?.name || 'Aplikasi Web');
+    const discussionAnswer = await generateDiscussionResponse(userPrompt, isFollowUp ? getRevisionSystemPrompt(existingFiles) : activeSystemPrompt, aiConfig, existingFiles, dbApp?.name || 'Aplikasi Web');
     await onEvent({ type: 'message', content: discussionAnswer, generationMode: 'live-ai' });
     return {
       isDiscussion: true,
@@ -746,7 +785,7 @@ Agar hasilnya sesuai dengan ekspektasi Anda, silakan pilih salah satu konsep pal
 Pengguna meminta perubahan pada aplikasi yang sedang aktif:
 "${formattedUserPrompt}"
 
-Lakukan perubahan secara langsung pada berkas target (misal public/css/style.css atau public/index.html). JANGAN bangun ulang dari awal. Segera panggil publish_app setelah selesai.`;
+Lakukan perubahan secara langsung pada berkas target berdasarkan ISI BERKAS TERBARU (lihat lampiran di instruksi sistem). JANGAN bangun ulang dari awal dan jangan hilangkan revisi sebelumnya. Panggil publish_app setelah perubahan berhasil tersimpan.`;
   }
 
   const toolCallsHistory: ToolCallItem[] = [];
@@ -756,6 +795,7 @@ Lakukan perubahan secara langsung pada berkas target (misal public/css/style.css
   let summaryMessage = '';
   let totalTokensUsed = 0;
   const writtenFiles: string[] = [];
+  let successfulEdits = 0;
 
   // Langsung kirimkan daftar tugas lengkap dari detik 0 ke antarmuka pengguna
   await onEvent({ type: 'todo', todoList, generationMode: 'live-ai' });
@@ -858,6 +898,7 @@ Lakukan perubahan secara langsung pada berkas target (misal public/css/style.css
       }
       resultOutput = await executeWriteFile(sessionId, args.path, finalContent);
       if (args.path && !writtenFiles.includes(args.path)) writtenFiles.push(args.path);
+      if (resultOutput.status !== 'preserved') successfulEdits++;
       await recordToolFinish(tc, resultOutput);
 
       todoList = syncTodoListProgress(todoList, { tool: 'write_file', path: args.path });
@@ -872,8 +913,8 @@ Lakukan perubahan secara langsung pada berkas target (misal public/css/style.css
           session_id: sessionId,
           name: dbApp?.name || 'Aplikasi Web',
           slug: dbApp?.slug || sessionId,
-          status: 'draft',
-          vercel_url: `/preview/${sessionId}`,
+          status: dbApp?.status || 'draft',
+          vercel_url: dbApp?.vercel_url || `/preview/${sessionId}`,
           files: currentFiles,
           created_at: dbApp?.created_at || new Date().toISOString(),
           updated_at: new Date().toISOString()
@@ -891,8 +932,12 @@ Lakukan perubahan secara langsung pada berkas target (misal public/css/style.css
         replacement_content: args.replacement_content
       });
       resultOutput = await executeEditFile(sessionId, args.path, args.target_content, args.replacement_content);
-      if (args.path && !writtenFiles.includes(args.path)) writtenFiles.push(args.path);
-      await recordToolFinish(tc, resultOutput);
+      const editOk = resultOutput.status === 'modified';
+      if (editOk) {
+        successfulEdits++;
+        if (args.path && !writtenFiles.includes(args.path)) writtenFiles.push(args.path);
+      }
+      await recordToolFinish(tc, resultOutput, editOk ? 'completed' : 'failed');
 
       todoList = syncTodoListProgress(todoList, { tool: 'edit_file', path: args.path });
       await onEvent({ type: 'todo', todoList, generationMode: 'live-ai' });
@@ -906,8 +951,8 @@ Lakukan perubahan secara langsung pada berkas target (misal public/css/style.css
           session_id: sessionId,
           name: dbApp?.name || 'Aplikasi Web',
           slug: dbApp?.slug || sessionId,
-          status: 'draft',
-          vercel_url: `/preview/${sessionId}`,
+          status: dbApp?.status || 'draft',
+          vercel_url: dbApp?.vercel_url || `/preview/${sessionId}`,
           files: currentFiles,
           created_at: dbApp?.created_at || new Date().toISOString(),
           updated_at: new Date().toISOString()
@@ -944,6 +989,15 @@ Lakukan perubahan secara langsung pada berkas target (misal public/css/style.css
 
       todoList = syncTodoListProgress(todoList, { tool: 'run_tests' });
       await onEvent({ type: 'todo', todoList, generationMode: 'live-ai' });
+    } else if (name === 'publish_app' && isFollowUp && successfulEdits === 0 && revisionPublishBlocked < 2) {
+      // Revisi: jangan terbitkan (dan laporkan "selesai") kalau belum ada satu pun perubahan yang tersimpan.
+      revisionPublishBlocked++;
+      const tc = await recordToolStart('publish_app', 'Publish ditunda: belum ada perubahan yang tersimpan', args);
+      resultOutput = {
+        success: false,
+        error: 'Belum ada perubahan berkas yang berhasil disimpan untuk revisi ini (edit_file sebelumnya gagal atau belum dipanggil). Baca berkas target dengan read_file, lalu terapkan perubahan dengan edit_file (teks target harus persis sama) atau write_file, baru panggil publish_app.'
+      };
+      await recordToolFinish(tc, resultOutput, 'failed');
     } else if (name === 'publish_app' && publishBlockedCount < 3 && getMissingReferencedAssets(wsDir).length > 0) {
       // Tolak publish selama berkas yang dirujuk index.html belum ada; minta AI melengkapinya dulu.
       publishBlockedCount++;
@@ -1203,7 +1257,7 @@ async function requestChatCompletion(
 
     let turn = 0;
     const hasExistingHtml = existingFiles.some((f) => f.includes('index.html') || f.endsWith('.html'));
-    const MAX_TURNS = isFollowUp ? (hasExistingHtml ? 6 : 14) : 18;
+    const MAX_TURNS = isFollowUp ? (hasExistingHtml ? 10 : 14) : 18;
 
     while (turn < MAX_TURNS && !deployedApp) {
       checkAborted();
@@ -1435,6 +1489,16 @@ async function requestChatCompletion(
         if (isFollowUp && writtenFiles.length === 0 && toolCallsHistory.length === 0) {
           break;
         }
+        if (isFollowUp && !deployedApp) {
+          // Revisi: cukup satu perubahan berkas yang BENAR-BENAR berhasil, lalu terbitkan (auto-finalize di bawah).
+          if (successfulEdits > 0) break;
+          // AI berhenti tanpa satu pun perubahan yang berhasil (mis. edit_file gagal karena teks target tidak cocok).
+          messages.push({
+            role: 'user',
+            content: 'Belum ada perubahan yang berhasil disimpan (edit_file gagal / belum dipanggil). Panggil read_file untuk berkas target, salin teks target PERSIS dari isi berkas, lalu panggil edit_file lagi. Jika perubahannya banyak, tulis ulang seluruh berkas dengan write_file. Jangan menyatakan selesai sebelum perubahan tersimpan.'
+          });
+          continue;
+        }
         if (!deployedApp) {
           const hasHtml = writtenFiles.some((f) => f.includes('index.html'));
           const hasJs = writtenFiles.some((f) => f.includes('app.js'));
@@ -1455,6 +1519,13 @@ async function requestChatCompletion(
           break;
         }
       }
+    }
+
+    if (isFollowUp && successfulEdits === 0 && toolCallsHistory.some((t) => t.tool === 'edit_file' || t.tool === 'write_file')) {
+      // Jujur ke pengguna: jangan sampai AI bilang "sudah diperbaiki" padahal tidak ada berkas yang berubah.
+      const failNote = '⚠️ Revisi ini BELUM tersimpan: AI gagal menemukan bagian kode yang mau diubah, jadi aplikasi tidak berubah. Coba kirim ulang dengan menyebut bagian yang dimaksud lebih spesifik (mis. judul/teks tombolnya).';
+      summaryMessage += (summaryMessage ? '\n\n' : '') + failNote;
+      await onEvent({ type: 'message', content: failNote, generationMode: 'live-ai' });
     }
 
     // Jangan terbitkan aplikasi setengah jadi: jika index.html merujuk berkas yang belum ada, simpan sebagai draft saja.
@@ -1543,7 +1614,7 @@ async function requestChatCompletion(
 
   let geminiTurn = 0;
   const hasExistingHtmlGemini = existingFiles.some((f) => f.includes('index.html') || f.endsWith('.html'));
-  const MAX_GEMINI_TURNS = isFollowUp ? (hasExistingHtmlGemini ? 6 : 14) : 18;
+  const MAX_GEMINI_TURNS = isFollowUp ? (hasExistingHtmlGemini ? 10 : 14) : 18;
 
   while (geminiTurn < MAX_GEMINI_TURNS && !deployedApp) {
     checkAborted();

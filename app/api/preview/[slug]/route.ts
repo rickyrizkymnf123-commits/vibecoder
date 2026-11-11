@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { getAppBySlug, getChatSessionById, saveApp } from '@/lib/supabase/db';
 import { getCurrentUser } from '@/lib/auth/session';
-import { getBaseWorkspacesDir, getWorkspaceDir } from '@/lib/agent/executor';
+import { getBaseWorkspacesDir, getWorkspaceDir, isPlaceholderContent } from '@/lib/agent/executor';
 import { getActiveSessionState } from '@/lib/agent/loop';
 
 export const dynamic = 'force-dynamic';
@@ -179,6 +179,7 @@ export async function GET(
 
   const files: Record<string, string> = { ...(app?.files || {}) };
 
+  const preferDiskFiles = getActiveSessionState((app as any)?.session_id || slug)?.status === 'building';
   if (diskWsDir && fs.existsSync(diskWsDir)) {
     const readDirRecursive = (dir: string, base: string) => {
       const entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -191,7 +192,9 @@ export async function GET(
           const rel = path.relative(base, full).replace(/\\/g, '/');
           try {
             const fileContent = fs.readFileSync(full, 'utf8');
-            if (!fileContent.startsWith('[Berkas tersimpan di disk')) {
+            // DB = sumber kebenaran; disk (/tmp, bisa basi di instance lain) hanya mengisi berkas yang belum ada di DB,
+            // kecuali build sedang berjalan di instance ini.
+            if (!fileContent.startsWith('[Berkas tersimpan di disk') && (preferDiskFiles || !(rel in files) || isPlaceholderContent(files[rel]))) {
               files[rel] = fileContent;
             }
           } catch {}

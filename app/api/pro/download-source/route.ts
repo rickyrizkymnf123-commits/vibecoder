@@ -4,7 +4,7 @@ import path from 'node:path';
 import { getCurrentUser } from '@/lib/auth/session';
 import { getAppById, getUserProfile } from '@/lib/supabase/db';
 import { zipAppSource } from '@/lib/builder/zipper';
-import { collectAllFiles, getWorkspaceDir } from '@/lib/agent/executor';
+import { collectAllFiles, getWorkspaceDir, mergeAppFiles } from '@/lib/agent/executor';
 
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
 
   const wsDir = app.session_id ? getWorkspaceDir(app.session_id) : '';
   const diskFiles = wsDir && fs.existsSync(wsDir) ? collectAllFiles(wsDir) : {};
-  const filesToZip = { ...(app.files || {}), ...diskFiles };
+  const filesToZip = mergeAppFiles(app.files, diskFiles);
 
   const zipBuffer = await zipAppSource(filesToZip);
 
