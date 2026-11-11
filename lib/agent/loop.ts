@@ -513,6 +513,13 @@ Anda dapat meminta saya untuk:
 Beri tahu saya apa yang ingin Anda lakukan!`;
 }
 
+/** Keluhan / laporan bug (sering ditulis sebagai pertanyaan "kenapa ... hilang?") yang harus diperbaiki, bukan dijawab. */
+function isComplaintOrBugReport(prompt: string): boolean {
+  const p = prompt.toLowerCase();
+  return /\b(kenapa|mengapa|kok|knp|napa)\b/.test(p) ||
+    /\b(hilang|ilang|gak muncul|ga muncul|tidak muncul|nggak muncul|gak ada|ga ada|tidak ada|ngga ada|rusak|error|eror|bug|gak bisa|ga bisa|gabisa|tidak bisa|nggak bisa|blank|kosong|berantakan|balik lagi|ga berubah|gak berubah|tidak berubah)\b/.test(p);
+}
+
 function isGeneralConversationOrQuestion(prompt: string, hasExistingApp = false): boolean {
   const p = prompt.toLowerCase().trim();
   if (!p) return true;
@@ -786,7 +793,12 @@ Agar hasilnya sesuai dengan ekspektasi Anda, silakan pilih salah satu konsep pal
 Pengguna meminta perubahan pada aplikasi yang sedang aktif:
 "${formattedUserPrompt}"
 
-Lakukan perubahan secara langsung pada berkas target berdasarkan ISI BERKAS TERBARU (lihat lampiran di instruksi sistem). JANGAN bangun ulang dari awal dan jangan hilangkan revisi sebelumnya. Panggil publish_app setelah perubahan berhasil tersimpan.`;
+Lakukan perubahan secara langsung pada berkas target berdasarkan ISI BERKAS TERBARU (lihat lampiran di instruksi sistem). JANGAN bangun ulang dari awal dan jangan hilangkan revisi sebelumnya. Panggil publish_app setelah perubahan berhasil tersimpan.${isComplaintOrBugReport(userPrompt) ? `
+
+CATATAN PENTING: Pesan pengguna di atas adalah LAPORAN MASALAH (meskipun ditulis sebagai pertanyaan). Jangan hanya menjelaskan — WAJIB PERBAIKI langsung di kode:
+- Bandingkan isi berkas terbaru dengan yang dikeluhkan pengguna. Jika ada bagian/fitur yang HILANG (mis. section landing page, menu, tombol, halaman), BUAT ULANG bagian tersebut secara lengkap dan layak (konten, styling, dan fungsinya) lalu sisipkan di posisi yang tepat.
+- Jika ada yang error / tidak berfungsi, temukan penyebabnya di kode lalu perbaiki.
+- Setelah perubahan berhasil tersimpan, jelaskan singkat penyebab & apa yang diperbaiki, lalu panggil publish_app.` : ''}`;
   }
 
   const toolCallsHistory: ToolCallItem[] = [];
@@ -990,7 +1002,7 @@ Lakukan perubahan secara langsung pada berkas target berdasarkan ISI BERKAS TERB
 
       todoList = syncTodoListProgress(todoList, { tool: 'run_tests' });
       await onEvent({ type: 'todo', todoList, generationMode: 'live-ai' });
-    } else if (name === 'publish_app' && isFollowUp && successfulEdits === 0 && revisionPublishBlocked < 2) {
+    } else if (name === 'publish_app' && isFollowUp && successfulEdits === 0) {
       // Revisi: jangan terbitkan (dan laporkan "selesai") kalau belum ada satu pun perubahan yang tersimpan.
       revisionPublishBlocked++;
       const tc = await recordToolStart('publish_app', 'Publish ditunda: belum ada perubahan yang tersimpan', args);
@@ -1522,9 +1534,9 @@ async function requestChatCompletion(
       }
     }
 
-    if (isFollowUp && successfulEdits === 0 && toolCallsHistory.some((t) => t.tool === 'edit_file' || t.tool === 'write_file')) {
+    if (isFollowUp && successfulEdits === 0 && toolCallsHistory.length > 0) {
       // Jujur ke pengguna: jangan sampai AI bilang "sudah diperbaiki" padahal tidak ada berkas yang berubah.
-      const failNote = '⚠️ Revisi ini BELUM tersimpan: AI gagal menemukan bagian kode yang mau diubah, jadi aplikasi tidak berubah. Coba kirim ulang dengan menyebut bagian yang dimaksud lebih spesifik (mis. judul/teks tombolnya).';
+      const failNote = '⚠️ Revisi ini BELUM tersimpan: belum ada satu pun perubahan kode yang berhasil diterapkan, jadi aplikasi tidak berubah (kredit tidak dipakai untuk publish). Coba kirim ulang dengan perintah yang lebih spesifik, mis. "tambahkan lagi bagian fitur, harga, dan testimoni di landing page di bawah hero".';
       summaryMessage += (summaryMessage ? '\n\n' : '') + failNote;
       await onEvent({ type: 'message', content: failNote, generationMode: 'live-ai' });
     }
@@ -1747,8 +1759,8 @@ async function requestChatCompletion(
     }
   }
 
-  if (isFollowUp && successfulEdits === 0 && toolCallsHistory.some((t) => t.tool === 'edit_file' || t.tool === 'write_file')) {
-    const failNote = '⚠️ Revisi ini BELUM tersimpan: AI gagal menemukan bagian kode yang mau diubah, jadi aplikasi tidak berubah. Coba kirim ulang dengan menyebut bagian yang dimaksud lebih spesifik (mis. judul/teks tombolnya).';
+  if (isFollowUp && successfulEdits === 0 && toolCallsHistory.length > 0) {
+    const failNote = '⚠️ Revisi ini BELUM tersimpan: belum ada satu pun perubahan kode yang berhasil diterapkan, jadi aplikasi tidak berubah (kredit tidak dipakai untuk publish). Coba kirim ulang dengan perintah yang lebih spesifik, mis. "tambahkan lagi bagian fitur, harga, dan testimoni di landing page di bawah hero".';
     summaryMessage += (summaryMessage ? '\n\n' : '') + failNote;
     await onEvent({ type: 'message', content: failNote, generationMode: 'live-ai' });
   }
