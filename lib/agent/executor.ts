@@ -174,47 +174,11 @@ export async function executeEditFile(
   }
 
   const content = fs.readFileSync(targetFile, 'utf8');
-  const target = String(targetContent ?? '');
-  const replacement = String(replacementContent ?? '');
-  if (!target.trim()) {
-    return { path: relPath, status: 'failed', replacements: 0, error: 'target_content kosong. Isi dengan potongan teks PERSIS dari berkas.' };
+  const applied = applyTextEdit(content, targetContent, replacementContent);
+  if (!applied.ok) {
+    return { path: relPath, status: 'failed', replacements: 0, error: applied.error.replace('{path}', relPath) };
   }
-
-  // 1) Cocok persis. Sengaja tidak memakai String.replace(string, string): pola "$&", "$1", "$$" di kode
-  //    pengganti (umum di JS/format Rupiah) akan diinterpretasikan dan merusak hasil.
-  let start = content.indexOf(target);
-  let matchLen = target.length;
-
-  // 2) Toleran spasi/indentasi/CRLF: AI sering salah menyalin indentasi atau spasi di akhir baris.
-  if (start === -1) {
-    const lines = target.replace(/\r\n/g, '\n').split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
-    if (lines.length > 0) {
-      const esc = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
-      const re = new RegExp(lines.map(esc).join('\\s*'), 'g');
-      const matches = Array.from(content.matchAll(re));
-      if (matches.length === 1 && matches[0].index !== undefined) {
-        start = matches[0].index;
-        matchLen = matches[0][0].length;
-      }
-    }
-  }
-
-  if (start === -1) {
-    const firstLine = target.split('\n').map((l) => l.trim()).find((l) => l.length > 3) || '';
-    const hintIdx = firstLine ? content.indexOf(firstLine) : -1;
-    const hint = hintIdx !== -1
-      ? ` Baris pertama target ditemukan; isi asli di sekitarnya:\n${content.slice(Math.max(0, hintIdx - 200), hintIdx + 600)}`
-      : ' Panggil read_file dulu lalu salin teks target PERSIS, atau tulis ulang berkas dengan write_file.';
-    return {
-      path: relPath,
-      status: 'failed',
-      replacements: 0,
-      error: `Target content tidak ditemukan di dalam ${relPath}.${hint}`
-    };
-  }
-
-  const newContent = content.slice(0, start) + replacement + content.slice(start + matchLen);
-  fs.writeFileSync(targetFile, newContent, 'utf8');
+  fs.writeFileSync(targetFile, applied.content, 'utf8');
 
   return {
     path: relPath,
@@ -707,4 +671,47 @@ export function mergeAppFiles(
     if (preferDisk || !(rel in merged) || isPlaceholderContent(merged[rel])) merged[rel] = content;
   }
   return merged;
+}
+
+/** Terapkan edit teks murni (dipakai edit_file & rekonstruksi riwayat versi). */
+export function applyTextEdit(
+  content: string,
+  targetContent: unknown,
+  replacementContent: unknown
+): { ok: true; content: string } | { ok: false; error: string } {
+  const target = String(targetContent ?? '');
+  const replacement = String(replacementContent ?? '');
+  if (!target.trim()) {
+    return { ok: false, error: 'target_content kosong. Isi dengan potongan teks PERSIS dari berkas.' };
+  }
+
+  // 1) Cocok persis. Sengaja tidak memakai String.replace(string, string): pola "$&", "$1", "$$" di kode
+  //    pengganti (umum di JS/format Rupiah) akan diinterpretasikan dan merusak hasil.
+  let start = content.indexOf(target);
+  let matchLen = target.length;
+
+  // 2) Toleran spasi/indentasi/CRLF: AI sering salah menyalin indentasi atau spasi di akhir baris.
+  if (start === -1) {
+    const lines = target.replace(/\r\n/g, '\n').split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
+    if (lines.length > 0) {
+      const esc = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+      const re = new RegExp(lines.map(esc).join('\\s*'), 'g');
+      const matches = Array.from(content.matchAll(re));
+      if (matches.length === 1 && matches[0].index !== undefined) {
+        start = matches[0].index;
+        matchLen = matches[0][0].length;
+      }
+    }
+  }
+
+  if (start === -1) {
+    const firstLine = target.split('\n').map((l) => l.trim()).find((l) => l.length > 3) || '';
+    const hintIdx = firstLine ? content.indexOf(firstLine) : -1;
+    const hint = hintIdx !== -1
+      ? ` Baris pertama target ditemukan; isi asli di sekitarnya:\n${content.slice(Math.max(0, hintIdx - 200), hintIdx + 600)}`
+      : ' Panggil read_file dulu lalu salin teks target PERSIS, atau tulis ulang berkas dengan write_file.';
+    return { ok: false, error: `Target content tidak ditemukan di dalam {path}.${hint}` };
+  }
+
+  return { ok: true, content: content.slice(0, start) + replacement + content.slice(start + matchLen) };
 }

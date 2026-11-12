@@ -121,6 +121,18 @@ export const AGENT_TOOLS: GeminiFunctionDeclaration[] = [
     }
   },
   {
+    name: 'restore_version',
+    description: "Melihat atau mengembalikan aplikasi ke versi sebelumnya dari RIWAYAT VERSI (versi tersimpan otomatis setiap kali aplikasi terbit). Gunakan saat pengguna minta \"balikin\", \"versi awal\", \"versi sebelumnya\", atau \"kayak dulu\". Mode lihat (only_view: true) mengembalikan isi berkas versi itu tanpa mengubah apa pun.",
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        version: { type: 'STRING', description: 'Nomor versi (mis. "1"), atau "awal" / "sebelumnya"' },
+        only_view: { type: 'BOOLEAN', description: 'true = hanya lihat isi versi tanpa mengembalikan' }
+      },
+      required: ['version']
+    }
+  },
+  {
     name: 'publish_app',
     description: 'Mempublikasikan aplikasi yang sudah selesai dibangun dan lolos pengujian ke antarmuka interactive live preview.',
     parameters: {
@@ -239,6 +251,21 @@ export function getOpenAiTools() {
               description: 'Tipe pengujian (default: "all")'
             }
           }
+        }
+      }
+    },
+    {
+      type: 'function' as const,
+      function: {
+        name: 'restore_version',
+        description: "Melihat atau mengembalikan aplikasi ke versi sebelumnya dari RIWAYAT VERSI (versi tersimpan otomatis setiap kali aplikasi terbit). Gunakan saat pengguna minta \"balikin\", \"versi awal\", \"versi sebelumnya\", atau \"kayak dulu\". Mode lihat (only_view: true) mengembalikan isi berkas versi itu tanpa mengubah apa pun.",
+        parameters: {
+          type: 'object',
+          properties: {
+            version: { type: 'string', description: 'Nomor versi (mis. "1"), atau "awal" / "sebelumnya"' },
+            only_view: { type: 'boolean', description: 'true = hanya lihat isi versi tanpa mengembalikan' }
+          },
+          required: ['version']
         }
       }
     },

@@ -21,6 +21,15 @@ import {
   collectAllFiles,
   isPlaceholderContent
 } from './executor';
+import {
+  ensureVersionHistory,
+  listAppVersions,
+  loadAppVersion,
+  saveAppVersion,
+  detectVersionReference,
+  pickReferencedVersion,
+  type AppVersionMeta
+} from './versions';
 import { ToolCallItem, TodoItem, GeneratedApp } from '../types';
 
 export interface AgentStepEvent {
@@ -333,6 +342,33 @@ SEMANTIC TARGETED BUG SURGEON (REVISI TEPAT SASARAN):
 4. DILARANG KERAS:
    - DILARANG menjalankan pengujian terminal 'bash' untuk revisi CSS/HTML teks.
    - DILARANG membuat nama aplikasi atau slug baru (seperti "KasirPro - Dark Mode") saat revisi; selalu pertahankan nama & slug aplikasi utama.${buildCurrentFilesContext(existingFiles, wsDir)}`;
+}
+
+function buildVersionContext(versions: AppVersionMeta[]): string {
+  const rows = versions
+    .slice(-15)
+    .map((v) => `- Versi ${v.number}${v.number === versions.length ? ' (SAAT INI)' : v.number === 1 ? ' (AWAL)' : ''}: "${v.label}" — ${v.createdAt.slice(0, 16).replace('T', ' ')} UTC`)
+    .join('\n');
+  return `\n\nRIWAYAT VERSI APLIKASI (tersimpan otomatis setiap terbit):\n${rows}
+- Untuk MENGEMBALIKAN seluruh aplikasi ke versi tertentu, panggil tool 'restore_version' dengan nomor versinya (lalu publish_app).
+- Untuk mengambil SEBAGIAN dari versi lama (mis. "landing page-nya kayak versi awal"), pakai isi versi lama yang dilampirkan di bawah (atau panggil 'restore_version' dengan only_view: true untuk melihatnya), lalu terapkan bagian itu ke berkas saat ini dengan edit_file/write_file tanpa menghapus fitur lain yang masih diminta.`;
+}
+
+function buildReferencedVersionContext(version: { number: number; label: string; files: Record<string, string> }, total: number): string {
+  const BUDGET = 90000;
+  let used = 0;
+  const parts: string[] = [];
+  const keys = Object.keys(version.files)
+    .filter((f) => /\.(html|css|js|mjs)$/i.test(f) && f !== 'server.js' && !f.startsWith('data/'))
+    .sort((a, b) => (a.endsWith('.html') ? 0 : 1) - (b.endsWith('.html') ? 0 : 1));
+  for (const f of keys) {
+    const c = version.files[f];
+    if (used + c.length > BUDGET) continue;
+    used += c.length;
+    parts.push(`===== VERSI ${version.number} · BERKAS: ${f} =====\n${c}\n===== AKHIR ${f} (VERSI ${version.number}) =====`);
+  }
+  if (parts.length === 0) return '';
+  return `\n\nPENGGUNA MERUJUK VERSI LAMA. Berikut isi VERSI ${version.number} dari ${total} ("${version.label}"). Ini adalah tampilan/kode yang dimaksud pengguna — salin bagian yang diminta dari sini, JANGAN menebak atau mengarang ulang:\n${parts.join('\n\n')}`;
 }
 
 /** Lampirkan isi berkas teks utama (versi terbaru) ke prompt revisi agar edit_file bisa menyalin teks target dengan tepat. */
@@ -725,7 +761,27 @@ export async function runAgenticLoop(options: RunAgentOptions): Promise<AgentRun
   }
 
   const isFollowUp = existingFiles.length > 0 || Boolean(dbApp);
-  const activeSystemPrompt = isFollowUp ? getRevisionSystemPrompt(existingFiles, wsDir) : FRESH_BUILD_SYSTEM_PROMPT;
+  let activeSystemPrompt = isFollowUp ? getRevisionSystemPrompt(existingFiles, wsDir) : FRESH_BUILD_SYSTEM_PROMPT;
+
+  // Riwayat versi: beri AI daftar versi + isi versi yang dirujuk ("versi awal", "versi sebelumnya", "balikin").
+  let appVersions: AppVersionMeta[] = [];
+  if (isFollowUp) {
+    try {
+      appVersions = await Promise.race([
+        ensureVersionHistory(sessionId, dbApp?.files),
+        new Promise<AppVersionMeta[]>((resolve) => setTimeout(() => resolve([]), 20000))
+      ]);
+      if (appVersions.length > 0) {
+        activeSystemPrompt += buildVersionContext(appVersions);
+        const ref = detectVersionReference(userPrompt);
+        const refMeta = ref ? pickReferencedVersion(appVersions, ref) : null;
+        const refVersion = refMeta ? await loadAppVersion(sessionId, refMeta) : null;
+        if (refVersion) activeSystemPrompt += buildReferencedVersionContext(refVersion, appVersions.length);
+      }
+    } catch (verErr) {
+      console.warn('[Agent] Gagal memuat riwayat versi:', verErr);
+    }
+  }
   const aiConfig = await getAiConfigAsync();
 
   // =========================================================================
@@ -934,6 +990,47 @@ CATATAN PENTING: Pesan pengguna di atas adalah LAPORAN MASALAH (meskipun ditulis
         };
         saveApp(draftApp).catch(() => {});
       } catch {}
+    } else if (name === 'restore_version') {
+      const tc = await recordToolStart('restore_version', `Mengembalikan ke versi ${args.version ?? ''}`.trim(), args);
+      const versions = appVersions.length > 0 ? appVersions : await listAppVersions(sessionId);
+      const raw = String(args.version ?? '').toLowerCase().trim();
+      let meta: AppVersionMeta | null = null;
+      if (/^\d+$/.test(raw)) meta = versions.find((v) => v.number === Number(raw)) || null;
+      else if (/awal|pertama|asli|first/.test(raw)) meta = versions[0] || null;
+      else meta = versions.length >= 2 ? versions[versions.length - 2] : versions[0] || null;
+      const version = meta ? await loadAppVersion(sessionId, meta) : null;
+      if (!version) {
+        resultOutput = { success: false, error: `Versi "${args.version}" tidak ditemukan. Versi tersedia: ${versions.map((v) => v.number).join(', ') || '(belum ada)'}` };
+        await recordToolFinish(tc, resultOutput, 'failed');
+      } else if (args.only_view === true || args.only_view === 'true') {
+        const files: Record<string, string> = {};
+        for (const [f, c] of Object.entries(version.files)) if (/\.(html|css|js)$/i.test(f)) files[f] = c.length > 60000 ? c.slice(0, 60000) + '\n…(terpotong)' : c;
+        resultOutput = { success: true, version: version.number, label: version.label, files };
+        await recordToolFinish(tc, { success: true, version: version.number, label: version.label, files: Object.keys(files) });
+      } else {
+        // Kembalikan penuh: tulis semua berkas versi itu, hapus berkas kode yang tidak ada di versi tersebut.
+        const keep = new Set(Object.keys(version.files));
+        for (const f of collectWorkspaceTextFiles(wsDir)) {
+          if (!keep.has(f) && /\.(html|css|js|mjs|json)$/i.test(f) && f !== 'package.json') {
+            try { fs.unlinkSync(resolveSafePath(wsDir, f)); } catch {}
+          }
+        }
+        for (const [f, c] of Object.entries(version.files)) {
+          try {
+            const full = resolveSafePath(wsDir, f);
+            fs.mkdirSync(path.dirname(full), { recursive: true });
+            const dataUrl = c.match(/^data:[^;,]+;base64,(.*)$/s);
+            if (dataUrl) fs.writeFileSync(full, Buffer.from(dataUrl[1], 'base64'));
+            else fs.writeFileSync(full, c, 'utf8');
+            if (!writtenFiles.includes(f)) writtenFiles.push(f);
+          } catch {}
+        }
+        successfulEdits++;
+        resultOutput = { success: true, restoredVersion: version.number, label: version.label, files: Object.keys(version.files) };
+        await recordToolFinish(tc, resultOutput);
+        todoList = syncTodoListProgress(todoList, { tool: 'write_file', path: 'public/index.html' });
+        await onEvent({ type: 'todo', todoList, generationMode: 'live-ai' });
+      }
     } else if (name === 'read_file') {
       const tc = await recordToolStart('read_file', `Membaca berkas: ${args.path}`, args);
       resultOutput = await executeReadFile(sessionId, args.path);
@@ -1578,7 +1675,10 @@ async function requestChatCompletion(
     }
 
     const finalSummary = summaryMessage || (deployedApp ? `Aplikasi ${deployedApp.name} telah selesai dibangun dan siap digunakan!` : 'Proses pembuatan aplikasi selesai.');
-    await onEvent({ type: 'complete', app: deployedApp, message: finalSummary, generationMode: 'live-ai' });
+    if (deployedApp?.files) {
+    await saveAppVersion(sessionId, deployedApp.files, userPrompt.slice(0, 80)).catch(() => false);
+  }
+  await onEvent({ type: 'complete', app: deployedApp, message: finalSummary, generationMode: 'live-ai' });
 
     return {
       deployedApp,
@@ -1802,6 +1902,9 @@ async function requestChatCompletion(
   }
 
   const finalSummary = summaryMessage || (deployedApp ? `Aplikasi ${deployedApp.name} telah selesai dibangun dan siap digunakan!` : 'Proses pembuatan aplikasi selesai.');
+  if (deployedApp?.files) {
+    await saveAppVersion(sessionId, deployedApp.files, userPrompt.slice(0, 80)).catch(() => false);
+  }
   await onEvent({ type: 'complete', app: deployedApp, message: finalSummary, generationMode: 'live-ai' });
 
   sessionState.status = 'completed';
@@ -1819,4 +1922,19 @@ async function requestChatCompletion(
     totalTokensUsed,
     generationMode: 'live-ai'
   };
+}
+
+function collectWorkspaceTextFiles(wsDir: string): string[] {
+  const out: string[] = [];
+  const walk = (d: string) => {
+    if (!fs.existsSync(d)) return;
+    for (const f of fs.readdirSync(d)) {
+      if (f === 'node_modules' || f === '.git' || f === 'screenshots') continue;
+      const p = path.join(d, f);
+      if (fs.statSync(p).isDirectory()) walk(p);
+      else out.push(path.relative(wsDir, p).split(path.sep).join('/'));
+    }
+  };
+  walk(wsDir);
+  return out;
 }
