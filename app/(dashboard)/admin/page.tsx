@@ -1201,25 +1201,26 @@ export default function AdminPage() {
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
                   Default Model
                 </label>
-                <select
+                {/* Input bebas + saran: router kadang menerima model yang tidak tercantum di /models (mis. ag/gemini-3-flash). */}
+                <input
+                  type="text"
+                  list="ai-model-options"
                   value={aiModelInput}
                   onChange={(e) => setAiModelInput(e.target.value)}
+                  placeholder="Ketik nama model, mis. ag/gemini-3-flash"
+                  autoComplete="off"
+                  spellCheck={false}
                   className="w-full px-3.5 py-2.5 bg-slate-950/90 border border-slate-800 rounded-xl text-white text-xs font-mono focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40 transition-colors"
-                >
-                  <option value="">-- Pilih Model --</option>
-                  {aiModelInput && !modelsList.includes(aiModelInput) && (
-                    <option value={aiModelInput}>{aiModelInput}</option>
-                  )}
+                />
+                <datalist id="ai-model-options">
                   {modelsList
                     .filter((m) => !m.includes('MAINTENANCE') && !m.includes('SOLD OUT') && !m.includes('SOLD'))
                     .map((m) => (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
+                      <option key={m} value={m} />
                     ))}
-                </select>
+                </datalist>
                 <p className="text-[11px] text-slate-500 mt-1">
-                  Model yang dipilih akan digunakan oleh semua AI edge functions & code generation
+                  Pilih dari daftar (klik Fetch Models) atau ketik manual. Model ini dipakai oleh semua AI edge functions & code generation
                 </p>
               </div>
 
