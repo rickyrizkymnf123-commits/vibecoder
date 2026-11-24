@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
+  Wrench,
   ShieldAlert,
   ShieldCheck,
   Crown,
@@ -39,6 +40,7 @@ import {
 import { UserProfile } from '@/lib/types';
 import { UserSubscriptionManagement } from '@/components/admin/UserSubscriptionManagement';
 import { AdminAppsManager } from '@/components/admin/AdminAppsManager';
+import { MaintenancePanel } from '@/components/admin/MaintenancePanel';
 
 interface PlatformStats {
   totalUsers: number;
@@ -63,15 +65,15 @@ interface AiConfigData {
 
 export default function AdminPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'subscriptions' | 'approval' | 'users' | 'apps' | 'stats' | 'ai'>(() => {
+  const [activeTab, setActiveTab] = useState<'subscriptions' | 'approval' | 'users' | 'apps' | 'stats' | 'ai' | 'maintenance'>(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const urlTab = params.get('tab');
-      if (urlTab && ['subscriptions', 'approval', 'users', 'apps', 'stats', 'ai'].includes(urlTab)) {
+      if (urlTab && ['subscriptions', 'approval', 'users', 'apps', 'stats', 'ai', 'maintenance'].includes(urlTab)) {
         return urlTab as any;
       }
       const savedTab = localStorage.getItem('forge_admin_active_tab');
-      if (savedTab && ['subscriptions', 'approval', 'users', 'apps', 'stats', 'ai'].includes(savedTab)) {
+      if (savedTab && ['subscriptions', 'approval', 'users', 'apps', 'stats', 'ai', 'maintenance'].includes(savedTab)) {
         return savedTab as any;
       }
     }
@@ -176,7 +178,7 @@ export default function AdminPage() {
     fetchInitialData();
   }, []);
 
-  const handleTabChange = (tab: 'subscriptions' | 'approval' | 'users' | 'apps' | 'stats' | 'ai') => {
+  const handleTabChange = (tab: 'subscriptions' | 'approval' | 'users' | 'apps' | 'stats' | 'ai' | 'maintenance') => {
     setActiveTab(tab);
     if (typeof window !== 'undefined') {
       localStorage.setItem('forge_admin_active_tab', tab);
@@ -697,6 +699,18 @@ export default function AdminPage() {
           <Cpu className="w-4 h-4 text-cyan-400" />
           <span>Pengaturan API KoboiLLM</span>
         </button>
+
+        <button
+          onClick={() => handleTabChange('maintenance')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 transition-all ${
+            activeTab === 'maintenance'
+              ? 'bg-gradient-to-r from-amber-600/30 to-orange-600/30 border border-amber-500/50 text-amber-200 shadow-lg shadow-amber-600/15'
+              : 'bg-slate-900/60 border border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-800'
+          }`}
+        >
+          <Wrench className="w-4 h-4 text-amber-400" />
+          <span>Maintenance</span>
+        </button>
       </div>
 
       {/* Main Content Area */}
@@ -1074,6 +1088,9 @@ export default function AdminPage() {
 
         {/* ======================= TAB 3: STATISTIK ======================= */}
         {activeTab === 'apps' && <AdminAppsManager onCountChange={setAppsCount} />}
+
+        {/* ======================= TAB: MAINTENANCE ======================= */}
+        {activeTab === 'maintenance' && <MaintenancePanel />}
 
         {activeTab === 'stats' && stats && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

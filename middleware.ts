@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { isAdminSessionToken, isOpenDuringMaintenance, readMaintenanceState } from './lib/maintenance/shared';
 
 export const config = {
   matcher: [
@@ -47,6 +48,23 @@ export async function middleware(req: NextRequest) {
         if (originHost !== host.toLowerCase()) {
           return NextResponse.json({ error: 'Permintaan lintas origin ditolak' }, { status: 403 });
         }
+      }
+    }
+
+    // Mode maintenance: semua member selain admin diarahkan ke halaman maintenance.
+    // Landing, login, halaman legal, profil publik & aplikasi user yang sudah publish tetap jalan.
+    if (!isOpenDuringMaintenance(url.pathname)) {
+      const maintenance = await readMaintenanceState();
+      if (maintenance.enabled && !(await isAdminSessionToken(req.cookies.get('forge_session')?.value))) {
+        if (url.pathname.startsWith('/api/')) {
+          return NextResponse.json(
+            { error: maintenance.message, maintenance: true },
+            { status: 503, headers: { 'Retry-After': '600', 'Cache-Control': 'no-store' } }
+          );
+        }
+        const res = NextResponse.rewrite(new URL('/maintenance', req.url));
+        res.headers.set('Cache-Control', 'no-store');
+        return res;
       }
     }
     return NextResponse.next();
