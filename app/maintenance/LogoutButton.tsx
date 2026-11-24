@@ -23,3 +23,29 @@ export function LogoutButton() {
     </button>
   );
 }
+
+/** Keluar dari Mode Intip (cookie impersonasi dihapus) lalu kembali ke panel admin. */
+export function ExitImpersonationButton() {
+  const [busy, setBusy] = useState(false);
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true);
+        try {
+          await fetch('/api/auth/impersonate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ exit: true })
+          });
+        } finally {
+          window.location.href = '/admin';
+        }
+      }}
+      className="px-3 py-1.5 rounded-lg bg-amber-300 text-slate-950 text-xs font-bold hover:bg-amber-200 transition disabled:opacity-60"
+    >
+      {busy ? 'Kembali…' : '← Kembali ke Mode Admin'}
+    </button>
+  );
+}

@@ -81,22 +81,38 @@ function b64urlToBytes(s: string): Uint8Array<ArrayBuffer> {
   return out;
 }
 
-/** True bila cookie sesi asli (bukan impersonasi) milik admin dan tanda tangannya valid. */
-export async function isAdminSessionToken(token: string | undefined): Promise<boolean> {
-  if (!token) return false;
+type TokenPayload = { email?: string; username?: string; role?: string; exp: number };
+
+/** Verifikasi tanda tangan + masa berlaku token sesi. Null bila tidak valid. */
+async function verifyToken(token: string | undefined): Promise<TokenPayload | null> {
+  if (!token) return null;
   const [dataB64, sigB64] = token.split('.');
-  if (!dataB64 || !sigB64) return false;
+  if (!dataB64 || !sigB64) return null;
   try {
     const secret = process.env.SESSION_SECRET || 'forge-session-secret-key-32bytes-len';
     const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
     const ok = await crypto.subtle.verify('HMAC', key, b64urlToBytes(sigB64), new TextEncoder().encode(dataB64));
-    if (!ok) return false;
+    if (!ok) return null;
     const p = JSON.parse(new TextDecoder().decode(b64urlToBytes(dataB64)));
-    if (!p || typeof p.exp !== 'number' || p.exp < Math.floor(Date.now() / 1000)) return false;
-    return p.role === 'admin' || ADMIN_EMAILS.includes(p.email) || ADMIN_USERNAMES.includes(p.username);
+    if (!p || typeof p.exp !== 'number' || p.exp < Math.floor(Date.now() / 1000)) return null;
+    return p;
   } catch {
-    return false;
+    return null;
   }
+}
+
+const isAdminPayload = (p: TokenPayload | null) =>
+  !!p && (p.role === 'admin' || ADMIN_EMAILS.includes(p.email || '') || ADMIN_USERNAMES.includes(p.username || ''));
+
+/**
+ * Boleh melewati maintenance? Hanya admin. Saat admin sedang Mode Intip, yang menentukan adalah akun
+ * yang diintip (sama seperti getCurrentUser), supaya admin melihat persis tampilan member.
+ */
+export async function canBypassMaintenance(sessionToken: string | undefined, impersonationToken: string | undefined): Promise<boolean> {
+  const real = await verifyToken(sessionToken);
+  if (!isAdminPayload(real)) return false;
+  const imp = await verifyToken(impersonationToken);
+  return imp ? isAdminPayload(imp) : true;
 }
 
 // ---- Path yang tetap terbuka saat maintenance ----

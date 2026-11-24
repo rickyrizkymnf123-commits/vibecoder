@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isAdminSessionToken, isOpenDuringMaintenance, readMaintenanceState } from './lib/maintenance/shared';
+import { canBypassMaintenance, isOpenDuringMaintenance, readMaintenanceState } from './lib/maintenance/shared';
 
 export const config = {
   matcher: [
@@ -55,7 +55,10 @@ export async function middleware(req: NextRequest) {
     // Landing, login, halaman legal, profil publik & aplikasi user yang sudah publish tetap jalan.
     if (!isOpenDuringMaintenance(url.pathname)) {
       const maintenance = await readMaintenanceState();
-      if (maintenance.enabled && !(await isAdminSessionToken(req.cookies.get('forge_session')?.value))) {
+      const bypass = maintenance.enabled
+        ? await canBypassMaintenance(req.cookies.get('forge_session')?.value, req.cookies.get('forge_impersonation')?.value)
+        : true;
+      if (!bypass) {
         if (url.pathname.startsWith('/api/')) {
           return NextResponse.json(
             { error: maintenance.message, maintenance: true },
